@@ -147,7 +147,7 @@ function FITjsParser() {
             try {
                 record = fitRecord.decode(dataview, i, definitions);
                 records.push(record);
-                console.log(`${i} + ${record?.length ?? 0} `, record);
+                // console.log(`${i} + ${record?.length ?? 0} `, record);
                 i += record?.length ?? 0;
             } catch(e) {
                 console.error(`:fit :decode :at ${i}/${byteLength} `, e);

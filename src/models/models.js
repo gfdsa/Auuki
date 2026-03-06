@@ -1,13 +1,14 @@
-import { xf, exists, existance, empty, equals, mavg,
+import { xf, exists, existance, empty, equals, mavg, avg, max,
          first, second, last, clamp, toFixed, isArray,
          isString, isObject } from '../functions.js';
 
-import { inRange, dateToDashString } from '../utils.js';
+import { inRange, dateToDashString, getStartEndOfWeek, isToday, timeDiff, pad } from '../utils.js';
 
 import { LocalStorageItem } from '../storage/local-storage.js';
 import { idb } from '../storage/idb.js';
 import { uuid } from '../storage/uuid.js';
 
+import API from './api.js';
 import { workouts as workoutsFile }  from '../workouts/workouts.js';
 import { zwo } from '../workouts/zwo.js';
 import { fileHandler } from '../file.js';
@@ -15,6 +16,7 @@ import { Model as Cycling } from '../physics.js';
 import { fit } from '../fit/fit.js';
 
 import { Device, Status, ControlMode, } from '../ble/enums.js';
+import { TimerStatus, EventType, } from '../activity/enums.js';
 
 class Model {
     constructor(args = {}) {
@@ -178,6 +180,7 @@ class Sources extends Model {
     }
     defaultValue() {
         const sources = {
+            // device data source map
             power:        'ble:controllable',
             cadence:      'ble:controllable',
             speed:        'ble:controllable',
@@ -187,9 +190,24 @@ class Sources extends Model {
             thb:          'ble:smo2',
             coreBodyTemperature: 'ble:coreTemp',
             skinTemperature:     'ble:coreTemp',
+
+            // settings
             virtualState: 'power',
-            autoPause:    false,
-            theme:        'DARK'
+            autoPause:    true,
+            autoStart:    true,
+            theme:        'DARK',
+
+            // data tile settings
+            // ['power1s', 'power3s']
+            powerZStack: 0,
+            // ['heartRate', 'heartRateLap', 'heartRateAvg']
+            heartRateZStack: 0,
+            // ['cadence', 'cadenceLap', 'cadenceAvg', 'cadenceTarget']
+            cadenceZStack: 0,
+            // ['powerAvg', 'powerLap', 'kcal']
+            kcalZStack: 0,
+            // ['graph', 'power']
+            graphZStack: 0,
         };
         return sources;
     }
@@ -337,7 +355,11 @@ class FTP extends Model {
     }
     toAbsolute(value, ftp) {
         const self = this;
-        if(value < self.minAbsValue) return parseInt(value * ftp);
+        if(value < self.minAbsValue) {
+            const roundedUpValue = Math.round(value * 100) / 100; // round up to second position after decimal point
+            const absolute = Math.round(roundedUpValue * (ftp ?? self.state));
+            return absolute;
+        }
         return value;
     }
     powerToZone(value, ftp, zones) {
@@ -409,7 +431,7 @@ class Weight extends Model {
         const storageModel = {
             key: self.prop,
             fallback: self.defaultValue(),
-            parse: parseInt,
+            parse: parseFloat,
         };
         self.min = existance(args.min, 0);
         self.max = existance(args.max, 500);
@@ -418,7 +440,7 @@ class Weight extends Model {
     defaultValue() { return 75; }
     defaultIsValid(value) {
         const self = this;
-        return Number.isInteger(value) && inRange(self.min, self.max, value);
+        return Number.isFinite(value) && inRange(self.min, self.max, value);
     }
 }
 
@@ -442,6 +464,50 @@ class Theme extends Model {
         return self.default;
     }
 }
+
+class DockMode extends Model {
+    postInit(args = {}) {
+        const self = this;
+        const storageModel = {
+            key: self.prop,
+            fallback: self.defaultValue(),
+            parse: (x) => x === 'true',
+        };
+        self.storage = new args.storage(storageModel);
+        self.values = [true, false];
+    }
+    defaultValue() { return false; }
+    switch(state) {
+        return !state;
+    }
+    apply(state) {
+        const self = this;
+        if(state && window.innerHeight > 200) {
+            self.resize();
+        }
+    }
+    calcSize() {
+        const width = window.screen.availWidth;
+        const height = 150;
+        const top = window.screen.availHeight - height;
+        return {width: width, height: height, top: top};
+    }
+    resize() {
+        const self = this;
+        let {width, height, top} = self.calcSize();
+        window.resizeTo(width, height);
+        window.moveTo(0, top);
+    }
+    open() {
+        const href = document.location.href;
+        let self = this;
+        let { width, height, top } = self.calcSize();
+
+        window.open(`${href}`, '', `width=${width},height=${height},left=0,top=${top}`);
+        window.close();
+    }
+}
+
 class Measurement extends Model {
     postInit(args = {}) {
         const self = this;
@@ -480,10 +546,132 @@ class DataTileSwitch extends Model {
     }
 }
 
-class Workout extends Model {
+class Activity extends Model {
+    // var activity = {
+    //         id: UUID,
+    //         blob: Blob,
+    //         summary: {
+    //             timestamp: Int,
+    //             duration: Int,
+    //             name: String,
+    //             status: {
+    //                 strava: String,
+    //                 intervals: String,
+    //                 trainingPeaks: String,
+    //             }
+    //         },
+    // };
+
+    name = 'activity';
     postInit(args) {
-        const self = this;
+        this.api = args.api;
+        this.capacity = 7;
     }
+    defaultValue() { return []; }
+    createFromCurrent(db) {
+        const id = uuid();
+        const blob = fileHandler.toBlob(this.encode(db));
+        const name = db.workout?.meta?.name ?? 'Powered by Auuki workout';
+
+        const summary = {
+            id,
+            timestamp: Date.now(),
+            name,
+            duration: db.elapsed ?? 0,
+            status: {strava: 'none', intervals: 'none', trainingPeaks: 'none'},
+        };
+        const record = {
+            id,
+            blob,
+            summary,
+        };
+
+        this.add(summary, db.activity);
+        idb.put('activity', record);
+        xf.dispatch('activity:add', summary);
+    }
+    add(activity, activityList) {
+        activityList.unshift(activity);
+        if(activityList.length > this.capacity) {
+            const summary = activityList.pop();
+            idb.remove('activity', summary.id);
+        }
+        return activityList;
+    }
+    remove(id) {
+        idb.remove('activity', id);
+    }
+    async upload(service, id) {
+        let record = await idb.get('activity', id);
+
+        if(service === 'strava' ||
+           service === 'intervals' ||
+           service === 'trainingPeaks') {
+
+            const res = await this.api[service].uploadWorkout(record);
+            record = await idb.get('activity', id);
+            record.summary.status[service] = res.substring(1);
+            await idb.put('activity', record);
+
+            xf.dispatch(`action:activity:${id}`, `:${service}:upload${res}`);
+        }
+        return;
+    }
+    async download(id) {
+        const self = this;
+        const record = await idb.get('activity', id);
+        fileHandler.download()(
+            record.blob,
+            self.fileName(record.summary.timestamp),
+            fileHandler.Type.OctetStream
+        );
+    }
+    fileName(timestamp) {
+        return `workout-${dateToDashString(new Date(timestamp))}.fit`;
+    }
+    encode(db) {
+        const records = db.records;
+        const laps = db.laps;
+        const events = db.events;
+        const ftp = db.ftp;
+
+        return fit.localActivity.encode({
+            records,
+            laps,
+            events,
+            ftp,
+        });
+    }
+    async restore() {
+        const records = await idb.getAll('activity') ?? [];
+
+        // migrate summary.status String to {strava: String, intervals: String}
+        records.forEach((record) => {
+            if(typeof record.summary.status === 'string') {
+                console.log(`:activity :migrating `, record.id);
+                record.summary.status = {strava: 'none', intervals: 'none'};
+                idb.put('activity', record);
+            }
+        });
+
+        return records
+            .map((record) => record.summary)
+            .sort((a, b) => b.timestamp - a.timestamp);
+    }
+}
+
+// TODO:
+// - differentiate between Workout and Activity
+// - this model should hold methods related to working on a Workout as memeber of the
+//   workout list or as the current selected workout
+// - Activity is about the current active recording, session, and the list of actities
+//   which are just recorded data or .fit format, Workout is about .zwo format
+class Workout extends Model {
+    postInit(args = {}) {
+        const self = this;
+        self.api = args.api;
+    }
+    // state init
     defaultValue() { return this.parse((first(workoutsFile))); }
     defaultIsValid(value) {
         return exists(value);
@@ -491,10 +679,17 @@ class Workout extends Model {
     restore(db) {
         return first(db.workouts);
     }
-    async readFromFile(file) {
-        const result = await fileHandler.read(file);
-        return {result, name: file.name};
+    // accessors
+    find(workouts, id) {
+        for(let workout of workouts) {
+            if(equals(workout.id, id)) {
+                return workout;
+            }
+        }
+        console.error(`tring to get a missing workout: ${id}`, workouts);
+        return first(workouts);
     }
+    // parsers
     parse(result, name = '') {
         if(isArray(result) || isObject(result)) {
             const view = new DataView(result);
@@ -504,53 +699,64 @@ class Workout extends Model {
         }
         return zwo.readToInterval(result);
     }
-    fileName () {
-        const self = this;
-        const now = new Date();
-        return `workout-${dateToDashString(now)}.fit`;
+    fromIntervalsEvent(event) {
+        const workout = this.parse(atob(event.workout_file_base64));
+        workout.meta.planned = true;
+        workout.meta.startDateLocal = event.start_date_local;
+        workout.id = uuid();
+        workout.intervals_id = event.id;
+        return workout;
     }
-    toFitRecords(db) {
-        return db.records;
+    fromIntervalsResponse(response) {
+        return response.map(this.fromIntervalsEvent.bind(this));
     }
-    toFitLaps(db) {
-        return db.laps;
-    }
-    toFitEvents(db) {
-        return db.events;
+    async readFromFile(file) {
+        const result = await fileHandler.read(file);
+        return {result, name: file.name};
     }
     encode(db) {
-        const self = this;
-
-        const records = self.toFitRecords(db);
-        const laps = self.toFitLaps(db);
-        const events = self.toFitEvents(db);
+        const records = db.records;
+        const laps = db.laps;
+        const events = db.events;
+        const ftp = db.ftp;
 
         return fit.localActivity.encode({
             records,
             laps,
             events,
+            ftp,
         });
     }
-    download(activity) {
-        const self = this;
-        const blob = new Blob([activity], {type: 'application/octet-stream'});
-        fileHandler.saveFile()(blob, self.fileName());
+    // utils
+    fileName () {
+        return `workout-${dateToDashString(new Date())}.fit`;
     }
-    save(db) {
-        const self = this;
-        self.download(self.encode(db));
+    download(db) {
+        fileHandler.download()(this.encode(db), this.fileName(), fileHandler.Type.OctetStream);
+    }
+    send(db) {
+        // TODO: remove the whole method
+        const name = this.fileName();
+        const blob = fileHandler.toBlob(this.encode(db));
+
+        this.api.strava.uploadWorkout(blob);
+
+        return {
+            name,
+            blob,
+        };
     }
 }
 
+// TODO:
+// - rename to Libarary
+// - use to just manage the library list of workouts
 class Workouts extends Model {
     name = 'workouts';
 
     init(args) {
         const self = this;
         self.workoutModel = args.workoutModel;
-    }
-    postInit(args) {
-        const self = this;
     }
     defaultValue() {
         const self = this;
@@ -581,7 +787,7 @@ class Workouts extends Model {
     }
     add(workouts, workout) {
         const self = this;
-        workouts.push(Object.assign(workout, {id: uuid()}));
+        workouts.push(idb.setId(workout));
         self.save(workout);
         return workouts;
     }
@@ -602,6 +808,107 @@ class Workouts extends Model {
         }
         idb.remove(self.name, id);
         return workouts.filter((w) => w.id !== id);
+    }
+}
+
+function yesterdayOrOlder(timestamp) {
+    return new Date().getDate() - new Date(timestamp).getDate() > 0;
+}
+
+// TODO:
+// - standardize the methods
+class Planned {
+    name = 'planned';
+    constructor(args = {}) {
+        const self = this;
+        this.data = this.defaultValue();
+        this.workoutModel = args.workoutModel;
+        this.athlete = {};
+        this.storage = LocalStorageItem({
+            key: 'planned',
+            encode: JSON.stringify,
+            parse: JSON.parse,
+            fallback: this.defaultValue(),
+        });
+    }
+    defaultValue() {
+        return {workouts: [], modified: {}};
+    }
+    get(id) {
+        for(let workout of this.data.workouts) {
+            if(workout.id === id) {
+                return workout;
+            }
+        }
+        console.error(`tring to get a missing planned workout: ${id}`);
+        return first(this.data.workouts);
+    }
+    setWorkouts(workouts) {
+        this.data.workouts = workouts;
+    }
+    list() {
+        return this.data.workouts;
+    }
+    setModified(service = 'intervals') {
+        this.data.modified[service] = Date.now();
+    }
+    isEmpty() {
+        return this.data.workouts.length === 0;
+    }
+    restore() {
+        console.log(':planned :restore');
+
+        this.data = this.storage.restore();
+
+        if(yesterdayOrOlder(this.data.modified.intervals)) {
+            console.log(`:planned :outdated :calling :wod 'intervals'`);
+            this.getAthlete('intervals');
+            this.wod('intervals');
+            return;
+        }
+
+        console.log(`:planned :up-to-date`);
+        xf.dispatch(`action:planned`, ':data');
+    }
+    backup() {
+        this.storage.set(this.data);
+        xf.dispatch(`action:planned`, ':data');
+    }
+    // force refresh the wod data
+    async wod(service) {
+        const self = this;
+        if(service === 'intervals') {
+            const { startOfWeek, endOfWeek } = getStartEndOfWeek(new Date(), true);
+            const response = await api.intervals.wod(startOfWeek, endOfWeek);
+            const workouts = self.workoutModel.fromIntervalsResponse(response);
+
+            this.setWorkouts(workouts);
+            this.setModified(service);
+            this.backup();
+
+            if(!this.isEmpty()) {
+                for(let workout of this.data.workouts) {
+                    if(isToday(workout.meta.startDateLocal)) {
+                        const id = workout.id;
+                        xf.dispatch(`action:li:${id}`, ':select');
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    async getAthlete(service) {
+        const self = this;
+        if(service === 'intervals') {
+            const response = await api.intervals.getAthlete();
+            console.log(response);
+            if(response.weight > 0) {
+                xf.dispatch('ui:weight-set', response.weight);
+            }
+            if(response.ftp > 0) {
+                xf.dispatch('ui:ftp-set', response.ftp);
+            }
+        }
     }
 }
 
@@ -682,6 +989,7 @@ function Session(args = {}) {
             // Workouts
             workout: db.workout,
             mode: db.mode,
+            lock: db.lock,
             page: db.page,
 
             // Targets
@@ -693,17 +1001,135 @@ function Session(args = {}) {
 
             // UI options
             powerSmoothing: db.powerSmoothing,
-            librarySwitch: db.librarySwitch,
         };
 
         return session;
     }
 
+    function reset(db) {
+        db.records = [];
+        db.lap = [];
+        db.laps = [];
+        db.events = [];
+        db.lapStartTime = false;
+        db.rrInterval = [];
+
+        db.elapsed = 0;
+        db.lapTime = 0;
+        db.stepTime = 0;
+        db.intervalIndex = 0;
+        db.stepIndex = 0;
+        db.intervalDuration = 0;
+        db.stepDuration = 0;
+
+        db.resistanceTarget = 0;
+        db.slopeTarget = 0;
+        db.powerTarget = 0;
+        db.position_lat = 0;
+        db.position_long = 0;
+        db.altitude = virtualState.altitude;
+        db.distance = virtualState.distance;
+        db.ascent = virtualState.ascent;
+        db.powerLap = powerLap.default;
+        db.heartRateLap = heartRateLap.default;
+        db.cadenceLap = cadenceLap.default;
+        db.kcal = kcal.default;
+        db.powerAvg = powerAvg.default;
+        db.cadenceAvg = cadenceAvg.default;
+        db.heartRateAvg = heartRateAvg.default;
+        db.powerLapCount = powerLap.count;
+        db.heartRateLapCount = heartRateLap.count;
+        db.cadenceLapCount = cadenceLap.count;
+        db.powerAvgCount = powerAvg.count;
+        db.cadenceAvgCount = cadenceAvg.count;
+        db.heartRateAvgCount = heartRateAvg.count;
+    }
+
+    function elapsed(x, db) {
+        if(equals(db.watchStatus, TimerStatus.stopped)) {
+            db.elapsed   = x;
+            return;
+        };
+
+        db.elapsed = x;
+
+        const speed = equals(db.sources.virtualState, 'speed') ?
+                    db.speed :
+                    db.speedVirtual;
+
+        const record = {
+            timestamp:  Date.now(),
+            power:      db.power1s,
+            cadence:    db.cadence,
+            speed:      speed,
+            heart_rate: db.heartRate,
+            distance:   db.distance,
+            grade:      db.slopeTarget,
+            altitude:   db.altitude,
+            position_lat:                 db.position_lat,
+            position_long:                db.position_long,
+            saturated_hemoglobin_percent: db.smo2,
+            total_hemoglobin_conc:        db.thb,
+            core_temperature:             db.coreBodyTemperature,
+            skin_temperature:             db.skinTemperature,
+            device_index:                 0,
+        };
+
+        db.records.push(record);
+        if(!empty(db.rrInterval)) {
+            db.records.push({time: pad(db.rrInterval, 5, 0xFFFF)});
+        }
+
+        db.lap.push(record);
+
+        if(equals(db.elapsed % 60, 0)) {
+            // models.session.backup(db);
+            backup(db);
+            console.log(`backing up of ${db.records.length} records ...`);
+        }
+    }
+
+    function lap(x, db) {
+        let timeEnd   = Date.now();
+        let timeStart = db.lapStartTime;
+        let elapsed   = timeDiff(timeStart, timeEnd);
+
+        if(elapsed > 0) {
+            const lap = {
+                timestamp:        timeEnd,
+                start_time:       timeStart,
+                totalElapsedTime: elapsed,
+                avgPower:         db.powerLap,
+                maxPower:         max(db.lap, 'power'),
+                avgCadence:       Math.round(avg(db.lap, 'cadence')),
+                avgHeartRate:     Math.round(avg(db.lap, 'heart_rate')),
+                saturated_hemoglobin_percent: toFixed(avg(db.lap, 'saturated_hemoglobin_percent'), 2),
+                total_hemoglobin_conc: toFixed(avg(db.lap, 'total_hemoglobin_conc'), 2),
+                core_temperature: toFixed(avg(db.lap, 'core_temperature'), 2),
+                skin_temperature: toFixed(avg(db.lap, 'skin_temperature'), 2)
+            };
+
+            db.laps.push(lap);
+            db.lap = [];
+        }
+        db.lapStartTime = timeEnd + 0;
+    }
+
+    function event(x, db) {
+        if(!empty(db.events) && equals(last(db.events).type, x.type)) return;
+        db.events.push(x);
+    }
+
     return Object.freeze({
         backup,
         restore,
+        reset,
         sessionToDb,
         dbToSession,
+
+        elapsed,
+        lap,
+        event,
     });
 }
 
@@ -1064,7 +1490,7 @@ class VirtualState extends MetaProp {
         this.lastUpdate = now;
 
         if(equals(dt, 0)) {
-            console.warn(`dt: ${dt}, s: ${this.speed}`);
+            // console.warn(`dt: ${dt}, s: ${this.speed}`);
             return;
         };
 
@@ -1147,6 +1573,7 @@ class TSS {
 }
 
 
+const api = API();
 
 const power = new Power({prop: 'power'});
 const cadence = new Cadence({prop: 'cadence'});
@@ -1169,15 +1596,19 @@ const page = new Page({prop: 'page'});
 const ftp = new FTP({prop: 'ftp', storage: LocalStorageItem});
 const weight = new Weight({prop: 'weight', storage: LocalStorageItem});
 const theme = new Theme({prop: 'theme', storage: LocalStorageItem});
+const dockMode = new DockMode({prop: 'dockMode', storage: LocalStorageItem});
 const volume = new Volume({prop: 'volume', storage: LocalStorageItem});
 const measurement = new Measurement({prop: 'measurement', storage: LocalStorageItem});
 const dataTileSwitch = new DataTileSwitch({prop: 'dataTileSwitch', storage: LocalStorageItem});
 
 const power1s = new PropInterval({prop: 'db:power', effect: 'power1s', interval: 1000});
+const power3s = new PropInterval({prop: 'db:power', effect: 'power3s', interval: 3000});
 const powerInZone = new PowerInZone({ftpModel: ftp});
 
-const workout = new Workout({prop: 'workout'});
+const activity = new Activity({prop: 'activity', api: api});
+const workout = new Workout({prop: 'workout', api: api});
 const workouts = new Workouts({prop: 'workouts', workoutModel: workout});
+const planned = new Planned({prop: 'planned', workoutModel: workout, api: api});
 
 const session = Session();
 
@@ -1193,6 +1624,7 @@ let models = {
     virtualState,
 
     power1s,
+    power3s,
     powerLap,
     powerAvg,
     powerInZone,
@@ -1213,16 +1645,21 @@ let models = {
     page,
     ftp,
     weight,
+    dockMode,
     volume,
     theme,
     measurement,
     dataTileSwitch,
 
+    activity,
     workout,
     workouts,
+    planned,
     session,
 
     PropInterval,
+
+    api,
 };
 
 export { models };

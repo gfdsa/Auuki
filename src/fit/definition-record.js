@@ -1,4 +1,4 @@
-import { nth, } from '../functions.js';
+import { nth, isArray, } from '../functions.js';
 
 import {
     HeaderType, RecordType,
@@ -163,7 +163,8 @@ function DefinitionRecord(args = {}) {
         };
     }
 
-    // ['message_name', ['field_name'], Int]
+    // ['message_name', ['field_name'], Int] |
+    // ['message_name', [['field_name', Int]], Int]
     // ->
     // {
     //     type: RecordType
@@ -176,15 +177,17 @@ function DefinitionRecord(args = {}) {
     // }
     function toFITjs(productMessageDefinition = ['', []]) {
         const messageName    = nth(0, productMessageDefinition);
-        const fieldNames     = nth(1, productMessageDefinition);
+        const fields         = nth(1, productMessageDefinition);
+        // const fieldNames     = fields;
         const local_number   = nth(2, productMessageDefinition);
-        const numberOfFields = fieldNames.length;
+        const numberOfFields = fields.length;
         const length         = fixedContentLength + (numberOfFields * fieldLength);
 
-        return fieldNames.reduce(function(acc, fieldName) {
-            const number    = profiles.fieldNameToNumber(messageName, fieldName);
-            const size      = profiles.fieldNameToSize(fieldName);
-            const base_type = profiles.fieldNameToBaseType(fieldName);
+        return fields.reduce(function(acc, field) {
+            const name      = isArray(field) ? field[0] : field;
+            const number    = profiles.fieldNameToNumber(messageName, name);
+            const size      = isArray(field) ? field[1] : profiles.fieldNameToSize(name);
+            const base_type = profiles.fieldNameToBaseType(name);
 
             acc.data_record_length += size;
             acc.fields.push({number, size, base_type});

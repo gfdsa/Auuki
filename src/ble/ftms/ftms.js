@@ -2,7 +2,7 @@
 // Fitness Machine Service
 //
 
-import { exists, expect, } from '../../functions.js';
+import { exists, expect, wait, } from '../../functions.js';
 import { uuids, } from '../web-ble.js';
 import { ControlMode, } from '../enums.js';
 import { Service } from '../service.js';
@@ -37,11 +37,25 @@ function FTMS(args = {}) {
     async function protocol() {
         const control = service.characteristics.control;
 
-        const res = await control.write(
-            controlParser.requestControl.encode()
-        );
+        if(exists(control)) {
+            const res = await control.write(
+                controlParser.requestControl.encode()
+            );
+            return res;
+        }
 
-        return res;
+        return false;
+    }
+
+    async function reset() {
+        const control = service.characteristics.control;
+
+        if(exists(control)) {
+            let res = await control.write(controlParser.reset.encode());
+            await wait(1000);
+            return res;
+        }
+        return false;
     }
 
     const spec = {
@@ -107,6 +121,7 @@ function FTMS(args = {}) {
     return Object.freeze({
         ...service, // FTMS will have all the public methods and properties of Service
         protocol,
+        reset,
         setSimulation,
         setPowerTarget,
         setResistanceTarget,

@@ -38,6 +38,9 @@ const productMessageDefinitions = [
         'saturated_hemoglobin_percent',
         'core_temperature',
     ], 3],
+    ['hrv', [
+        ['time', 10],
+    ], 4],
     ['lap', [
         'timestamp',
         'start_time',
@@ -46,7 +49,7 @@ const productMessageDefinitions = [
         'message_index',
         'event',
         'event_type',
-    ], 4],
+    ], 5],
     ['session', [
         'timestamp',
         'start_time',
@@ -67,7 +70,8 @@ const productMessageDefinitions = [
         'max_power',
         'first_lap_index',
         'num_laps',
-    ], 5],
+        'threshold_power',
+    ], 6],
     ['activity', [
         'timestamp',
         'total_timer_time',
@@ -76,10 +80,10 @@ const productMessageDefinitions = [
         'event',
         'event_type',
         // 'local_timestamp',
-    ], 6],
+    ], 7],
     ['course', [
         'name',
-    ], 7],
+    ], 8],
     // ['field_description', [
     //     'developer_data_index',
     //     'field_definition_number',

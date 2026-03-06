@@ -7,6 +7,7 @@ import { g } from './graph.js';
 
 function powerToHeight(power, powerMax, viewPort) {
     const height = translate(power, 0, powerMax, 0, viewPort.height * 0.90);
+    // console.log(`${viewPort.height} -> ${height}`);
     if(height < (viewPort.height * 0.10)) {
         return viewPort.height * 0.14;
     }
@@ -68,7 +69,7 @@ function intervalsToGraph(workout, ftp, viewPort) {
         }
 
         return '';
-    }, '<div id="graph--info--cont"></div>');
+    }, '<div class="graph--info--cont"></div>');
 }
 
 function renderInfo(args = {}) {
@@ -91,7 +92,7 @@ function renderInfo(args = {}) {
     const width  = dom.info.getBoundingClientRect().width;
     const height = dom.info.getBoundingClientRect().height;
     const minHeight = (bottom + height + (40)); // fix 40
-    dom.info.style.left   = `min(${contWidth}px - ${width}px, ${left}px)`;
+    dom.info.style.left = `min(${contWidth}px - ${width}px, ${left}px)`;
 
     if(window.innerHeight > minHeight) {
         dom.info.style.bottom = bottom;
@@ -113,6 +114,7 @@ class WorkoutGraph extends HTMLElement {
     connectedCallback() {
         const self = this;
         this.dom = {};
+        this.$graphCont = document.querySelector('#graph-workout') ?? this;
         this.viewPort = this.getViewPort();
         this.abortController = new AbortController();
         this.signal = { signal: self.abortController.signal };
@@ -122,6 +124,7 @@ class WorkoutGraph extends HTMLElement {
                 self.onWindowResize.bind(this), 300, {trailing: true, leading: false},
             ),
         };
+
 
         xf.sub(`db:workout`, this.onWorkout.bind(this), this.signal);
         xf.sub(`db:ftp`, this.onFTP.bind(this), this.signal);
@@ -134,13 +137,15 @@ class WorkoutGraph extends HTMLElement {
 
         this.addEventListener('mouseover', this.onHover.bind(this), this.signal);
         this.addEventListener('mouseout', this.onMouseOut.bind(this), this.signal);
-        window.addEventListener('resize', this.debounced.onWindowResize.bind(this), this.signal);
+        // window.addEventListener('resize', this.debounced.onWindowResize.bind(this), this.signal);
+        window.addEventListener('resize', this.onWindowResize.bind(this), this.signal);
     }
     disconnectedCallback() {
         this.abortController.abort();
     }
     getViewPort() {
-        const rect = this.getBoundingClientRect();
+        // const rect = this.getBoundingClientRect();
+        const rect = this.$graphCont.getBoundingClientRect();
 
         return {
             width: rect.width,
@@ -222,17 +227,23 @@ class WorkoutGraph extends HTMLElement {
             const $parent = self;
             const height = $parent.getBoundingClientRect().height;
             const width = $parent.getBoundingClientRect().width;
-            const left = translate(distance, 0, totalDistance, 0, window.innerWidth);
+            const left = translate(distance, 0, totalDistance, 0, width);
             $dom.active.style.left   = `${left % width}px`;
             $dom.active.style.width  = `2px`;
             $dom.active.style.height = `${height}px`;
+
+            if(equals(this.type, 'course')) {
+                $dom.progress.style.left   = `${left % width}px`;
+            }
         }
         return;
     }
     onLapTime(lapTime) {
         const self = this;
         this.lapTime = lapTime;
-        this.progress({index: self.index, dom: self.dom, parent: self, lapTime: self.lapTime});
+        if(equals(this.type, 'workout')) {
+            this.progress({index: self.index, dom: self.dom, parent: self, lapTime: self.lapTime});
+        }
     }
     progress(args = {}) {
         if(this.workoutStatus === "done") {
@@ -261,7 +272,7 @@ class WorkoutGraph extends HTMLElement {
             this.innerHTML = progress +
                 intervalsToGraph(this.workout, this.ftp, this.viewPort);
 
-            this.dom.info      = this.querySelector('#graph--info--cont');
+            this.dom.info      = this.querySelector('.graph--info--cont');
             this.dom.progress  = this.querySelector('#progress');
             this.dom.active    = this.querySelector('#progress-active');
             this.dom.intervals = this.querySelectorAll('.graph--bar-group');
@@ -274,7 +285,7 @@ class WorkoutGraph extends HTMLElement {
             this.innerHTML = progress +
                 courseToGraph(this.workout, this.viewPort);
 
-            this.dom.info     = this.querySelector('#graph--info--cont');
+            this.dom.info     = this.querySelector('.graph--info--cont');
             this.dom.progress = this.querySelector('#progress');
             this.dom.active   = this.querySelector('#progress-active');
         }
@@ -343,7 +354,7 @@ function courseToGraph(course, viewPort) {
           `<altitude-value class="elevation--value altitude--value">${altitudeSpec.start ?? '--'}</altitude-value>
         <ascent-value class="elevation--value ascent--value">0.0</ascent-value>`;
 
-    return `${display}<div id="graph--info--cont"></div><svg class="graph--bar-group" width="100%" height="100%" viewBox="0 0 ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMinYMax meet">${track}</svg>`;
+    return `${display}<div class="graph--info--cont"></div><svg class="graph--bar-group" width="100%" height="100%" viewBox="0 0 ${viewBox.width} ${viewBox.height}" preserveAspectRatio="xMinYMax meet">${track}</svg>`;
 }
 
 export {

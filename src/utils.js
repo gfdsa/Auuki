@@ -8,10 +8,10 @@ function formatTime(args = {}) {
     };
 
     const value  = args.value;
-    const format = existance(args.format, defaults.format);
-    const unit   = existance(args.unit, defaults.unit);
+    const format = args.format ?? defaults.format;
+    const unit   = args.unit ?? defaults.unit;
 
-    if(equals(unit, 'seconds')) {
+    if(unit === 'seconds') {
         let hour = Math.floor(value / 3600);
         let min  = Math.floor(value % 3600 / 60);
         let sec  = value % 60;
@@ -21,10 +21,10 @@ function formatTime(args = {}) {
         let hDs  = (hour < 10) ? `${hour}`  : `${hour}`;
         let res  = ``;
 
-        if(equals(format, 'hh:mm:ss')) {
+        if(format === 'hh:mm:ss') {
             res = `${hD}:${mD}:${sD}`;
         }
-        if(equals(format, 'mm:ss')) {
+        if(format === 'mm:ss') {
             if(value < 3600) {
                 res = `${mD}:${sD}`;
             } else {
@@ -54,6 +54,59 @@ function time() {
     const seconds = (date.getSeconds()).toString().padStart(2,'0');
     const milliseconds = (date.getSeconds().toString()).padStart(4,'0');
     return `${hours}:${minutes}:${seconds}:${milliseconds}`;
+}
+
+function isoDate(date = new Date(), local = true) {
+    if(local) {
+        const day   = (date.getDate()).toString().padStart(2, '0');
+        const month = (date.getMonth()+1).toString().padStart(2, '0');
+        const year  = date.getFullYear().toString();
+        return `${year}-${month}-${day}`;
+    } else {
+        // toISOString returns always the utc date
+        return date.toISOString().split('T')[0];
+    }
+}
+
+function isoDateToWeekDay(isoDateString = isoDate()) {
+    let date = new Date(isoDateString);
+    let day = date.getDate();
+    let weekDay = date.toLocaleString('en-US', {weekday: 'short'});
+    return { day, weekDay };
+}
+
+function getStartEndOfWeek(fromDate = new Date(), iso = false) {
+    const date = new Date(fromDate);
+    const dayOfWeek = date.getDay();
+
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    let startOfWeek = new Date(date);
+    startOfWeek.setDate(startOfWeek.getDate() + mondayOffset);
+
+    let endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(endOfWeek.getDate() + 6);
+
+    if(iso) {
+        startOfWeek = isoDate(startOfWeek);
+        endOfWeek = isoDate(endOfWeek);
+    }
+
+    return {
+            startOfWeek,
+            endOfWeek,
+        };
+
+}
+
+function isToday(dateString) {
+    const date = new Date(dateString);
+    const today = new Date();
+
+    return (
+        date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth() &&
+        date.getDate() === today.getDate()
+    );
 }
 
 function format(x, precision = 1000) {
@@ -229,6 +282,13 @@ function splitAt(xs, at) {
     },[]);
 }
 
+function pad(xs = [], length = 0, value = 0) {
+    for(let i = xs.length-1; i < length; i += 1) {
+        xs.push(value);
+    }
+    return xs;
+}
+
 function calculateCRC(uint8array, start, end) {
     const crcTable = [
         0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
@@ -281,10 +341,17 @@ export {
     // format
     formatTime,
     dateToDashString,
+    isoDate,
+    isoDateToWeekDay,
+    getStartEndOfWeek,
+    isToday,
     format,
     kphToMps,
     mpsToKph,
     time,
+
+    // data
+    pad,
 
     // async
     backoff,

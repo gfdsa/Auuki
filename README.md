@@ -1,49 +1,45 @@
+<img alt="Auuki Indoor Cyling app for Structured Training" src="https://github.com/user-attachments/assets/292a3216-2f52-4994-9b15-614446e41912" />
+
 # Auuki
+Auuki is a powerful, no-nonsense app built for hammering out **structured workouts** on a smart trainer, right in your browser. No installs, no dependencies, no slow updates taking from precious training time.
 
-Auuki is an App for executing structured workouts on a smart trainer.
+**Key Features**:
+* Run Zwift **.ZWO workouts**
+* Connect via **Bluetooth** to smart trainers, power meters, heart rate monitors, the moxy monitor, and many more
+* Full control with **ERG mode**, **Grade Simulation**, and **Resistance mode**
+* Workouts with **Slope-based targets** for realistic effort control
+* Record **.FIT activities** in a cross-industry standard
+* Recording of native **RR intervals** in the .FIT file
+* Built-in structured workouts to get you started
+* **Intervals.icu and Strava** integrations for seamless syncing and uploads
 
-- executing Zwift .zwo workouts
-- riding .fit courses and activities
-- works with bluetooth smart trainers, power meters and heart rate monitors.
-- ERG mode and extended manual control of your trainer with Grade Simulation and Resistance mode.
-- workouts with [Slope targets](https://github.com/dvmarinoff/Auuki/wiki/Slope-target-for-workout-intervals)
-- recording .FIT Activities compatible with all major platforms like Strava, Training Peaks, etc
-- build-in collection of structured workouts to get you started
+Built as a **progressive web app (PWA)**, Auuki is fully browser-based and runs independently. It makes use of some of the most advanced Browser APIs like: Web Bluetooth, Web Serial, and Web Components. The web version is **free and open-source**, keeping everything on your device.
+Train anywhere, with full control directly in your browser.
 
-The web version is free to use and open source. It is developed as a static PWA, has zero dependancies and is completly independant to run.
-Everything happens in your Browser and stays in there. It uses Web Bluetooth, Web Serial, Web Components, IndexDB, Local Storage, WakeLock API.
+_Status_: Currently working on creating a full suite of Apple platform native apps (iOS, iPadOS, tvOS, watchOS).
 
-_Status_: Currently working on creating a backend API and iOS app.
+# The Web App
+- You can find the web app at [auuki.com](https://auuki.com)
+- There is also a special development version which has the latest features available for preview: [dev.auuki.com](https://dev.auuki.com)
+- [How to create a Profile and Connect Intervals.icu](https://forum.intervals.icu/t/auuki-com-intervals-icu-integration/87105)
 
-## Screenshots
+## Sponsors 💖
+So, if you’re loving what Auuki’s bringing to the table, consider supporting the project on [GitHub Sponsors](https://github.com/sponsors/dvmarinoff)? Think of it as buying me a coffee or, heck, a whole power meter to keep this thing cranking. Hit that sponsor button and let’s keep the good times rolling!
 
-<table>
-  <tr>
-     <td>
-       <img alt="Home Page" width="320px" src="doc/images/home-page.jpg" />
-     </td>
-     <td>
-       <img alt="Workouts Page" width="320px" src="doc/images/workouts-page.jpg" />
-     </td>
-     <td>
-       <img alt="Settings-page" width="320px" src="doc/images/settings-page.jpg" />
-     </td>
-  </tr>
-</table>
+## Supported Browsers and Platforms
 
-## Supported Browsers
+### MacOS, Windows, Andorid 
 
-**TL;DR:** Use Google Chrome on Android, Windows 10, Mac (M1 or Intel) and Ubuntu, but not iOS.
+Please use either Chrome, Edge, Opera, Samsung Internet, or Brave. These browsers include built-in bluetooth.
 
-The Web version is running directly in the browser and relies on some of the latest web technologies. Browsers like Firefox and Safari don't have support for them. On iOS Safari is the only allowed browser, and even Chrome for iOS is just Safari with a Chrome skin. Browser support for the web version is the following:
+| Chrome | Edge | Opera | Chrome Android | Samsung Internet | Brave | Firefox | Safari | Safari iOS | Chrome iOS |
+|--------|------|-------|----------------|------------------|-------|---------|--------|------------|------------|
+| yes    | yes  | yes   | yes            | yes              | yes*  | no      | no     | no         | no         |
 
-| Chrome | Edge | Opera | Chrome Android | Samsung Internet | Firefox | Safari | Safari iOS | Chrome iOS |
-|--------|------|-------|----------------|------------------|---------|--------|------------|------------|
-| yes    | yes  | yes   | yes            | yes              | no      | no     | no         | no         |
-
+If using Brave browser, you'll need to [manually enable bluetooth support](https://community.brave.com/t/can-you-enable-web-bluetooth-api-in-brave/522553/2).
 
 ### Linux
-On Chrome, Edge and Opera for Linux you might need to turn on the experimental platforms feature flag at
+On Linux you might need to turn on the experimental platforms feature flag in your browser:
 
 - Chrome: `chrome://flags/#enable-experimental-web-platform-features`
 
@@ -52,13 +48,11 @@ On Chrome, Edge and Opera for Linux you might need to turn on the experimental p
 - Opera: `opera://flags/#enable-experimental-web-platform-features`
 
 ### iOS
-work is in progress to finnish the iOS, expect updates soon ...
-
-
+Not Supported by the Web version
 
 ## Supported Trainers
 
-### FTMS, or FE-C over BLE
+### FTMS, FE-C over BLE, or WahooCPS
 
 Works with all trainers that implement the bluetooth Fitness Machine Service (FTMS) or the Tacx FE-C over BLE solution.
 
@@ -86,34 +80,29 @@ Support for ANT+ is experimental at the moment. It is being rewritten right now 
 The current development setup is using Suunto movestick mini, Garmin Fenix 5 watch broadcasting heart rate,
 Tacx Heart Rate monitor, Tacx Flux S trainer, and X240 laptop with Ubuntu 20.04.2 LTS, M1 Mac, and Samsung S9 Android phone.
 
-## The Demo
-You can check a pre-release demo of the web version at
-[Latest Version on master](https://auuki.com)
-
-Keep in mind it is in active development and will change and break on daily bases, that's until the first stable version is released.
-
 ## Manual
-
+- [How to create a Profile and Connect Intervals.icu](https://forum.intervals.icu/t/auuki-com-intervals-icu-integration/87105)
 - [How-To: Using the connection settings](https://github.com/dvmarinoff/Auuki/discussions/91)
 - [How-To: Using Auuki and another app concurrently](https://github.com/dvmarinoff/Auuki/discussions/101)
 
-<!-- sponsors -->
-## Sponsers 💖
-
-While Auuki is free software and will always be, the project would benefit immensely from some funding. Raising a monthly budget we help cover the development and runnig costs for servers, databases, domains, storage, and others.
-
-You can support the development of Auuki via [Github Sponsers](https://github.com/sponsors/dvmarinoff).
-
-### Backers
+## Backers
 <div>
     <a href="https://github.com/KlausMu" target="_blank">
-        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/14290221?v=4" width="64" height="64" />
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/14290221?v=4" width="48" height="48" />
     </a>
     <a href="https://github.com/TClin76" target="_blank">
-        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/96434118?v=4" width="64" height="64" />
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/96434118?v=4" width="48" height="48" />
     </a>
     <a href="https://github.com/fvolcic" target="_blank">
-        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/59806465?s=64&v=4" width="64" height="64" />
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/59806465?s=64&v=4" width="48" height="48" />
+    </a>
+    <a href="https://github.com/napfbike" target="_blank">
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/192727271?v=4" width="48" height="48" />
+    </a>
+    <a href="https://github.com/sharalds" target="_blank">
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/25537910?v=4" width="48" height="48" />
+    </a>
+    <a href="https://github.com/BenSimpsonAnalytics" target="_blank">
+        <img style="display: inline-block;" src="https://avatars.githubusercontent.com/u/81325092?v=4" width="48" height="48" />
     </a>
 </div>
-<!-- sponsors -->

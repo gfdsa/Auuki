@@ -17,7 +17,7 @@ function Keyboard() {
         let keyCode = e.keyCode;
         let code = e.code;
 
-        if (e.isComposing ||
+        if(e.isComposing ||
             keyCode === 229 ||
             e.ctrlKey ||
             e.shiftKey ||
@@ -100,6 +100,7 @@ function KeyboardControls() {
     xf.sub('key:space', e => {
         if(watchStatus === 'paused' || watchStatus === 'stopped') {
             xf.dispatch('ui:watchStart');
+            xf.dispatch('ui:workoutStart');
         } else {
             xf.dispatch('ui:watchPause');
         }

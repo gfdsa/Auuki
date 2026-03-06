@@ -249,6 +249,17 @@ function curry2(fn) {
     };
 }
 
+function once(fn, context) {
+    let result;
+    return function() {
+        if(fn) {
+            result = fn.apply(context || this, arguments);
+            fn = null;
+        }
+        return result;
+    };
+}
+
 //
 // Copied from lodash.js
 //
@@ -555,6 +566,18 @@ function time() {
     return `${mm}:${ss}:${mmmm}`;
 }
 
+function formatDate(args = {}) {
+    const date = args.date ?? new Date();
+    const s = args.separator ?? '/';
+    const showYear = args.year ?? true;
+
+    const day    = (date.getDate()).toString().padStart(2, '0');
+    const month  = (date.getMonth()+1).toString().padStart(2, '0');
+    const year   = date.getFullYear().toString();
+
+    return `${day}${s}${month}${showYear ? s : ''}${showYear ? year : ''}`;
+}
+
 // Bits
 function nthBit(field, bit) {
     return (field >> bit) & 1;
@@ -726,6 +749,7 @@ export {
     repeat,
     nth,
     curry2,
+    once,
     debounce,
 
     // async
@@ -745,6 +769,7 @@ export {
     arrayBufferToArray,
     stringToCharCodes,
     time,
+    formatDate,
     print,
     Spec,
 

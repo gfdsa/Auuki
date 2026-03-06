@@ -151,11 +151,13 @@ function FitNumber() {
         throw `Not implemented!`;
     }
 
-    function apply(scale, offset, value) {
+    function apply(scale, offset, value, invalid) {
+        if(invalid !== undefined && value === invalid) return value;
         return ((value ?? 0) * (scale ?? 1)) + ((offset ?? 0) * (scale ?? 1));
     }
 
-    function remove(scale, offset, value) {
+    function remove(scale, offset, value, invalid) {
+        if(invalid !== undefined && value === invalid) return value;
         return ((value ?? 0) - ((offset ?? 0) * (scale ?? 1))) / (scale ?? 1);
     }
 
@@ -165,7 +167,7 @@ function FitNumber() {
     function encode(field, value, view, i = 0, architecture = true) {
         return setView(
             field.base_type,
-            apply(field.scale, field.offset, value),
+            apply(field.scale, field.offset, value, field.invalid),
             view, i, architecture
         );
     }
@@ -177,7 +179,8 @@ function FitNumber() {
         return remove(
             field.scale,
             field.offset,
-            getView(field.base_type, view, i, architecture)
+            getView(field.base_type, view, i, architecture),
+            field.invalid
         );
     }
 

@@ -3,27 +3,56 @@
 // Heart Rate Measurement characteristic
 //
 
-const heartRateFormat = (flags) => ((flags >> 0) & 1) === 1;
-const inContact       = (flags) => ((flags >> 1) & 1) === 1;
-const sensorContact   = (flags) => ((flags >> 2) & 1) === 1;
-const energyExpanded  = (flags) => ((flags >> 3) & 1) === 1;
-const rrInterval      = (flags) => ((flags >> 4) & 1) === 1;
-
-function readHeartRate(dataview) {
-    const flags = dataview.getUint8(0, true);
-    const datatype = heartRateFormat(flags) ? 'Uint16' : 'Uint8';
-    return dataview['get' + datatype](1, true);
-}
-
 function HeartRateMeasurement(args = {}) {
+    const rrIntervalResolution = 1024;
 
     function decode(dataview) {
+        const flags = dataview.getUint8(0, true);
+        const heartRateValueFormat    = ((flags >> 0) & 1) === 1;
+        const sensorContactStatus     = ((flags >> 1) & 1) === 1;
+        const sensorContactSupported  = ((flags >> 2) & 1) === 1;
+        const energyExpenditureStatus = ((flags >> 3) & 1) === 1;
+        const rrIntervalPresent       = ((flags >> 4) & 1) === 1;
+
+        let i = 1;
+        let heartRate = 0;
+        let energyExpenditure;
+        let rrInterval;
+
+        if(heartRateValueFormat) {
+            heartRate = dataview.getUint16(i, true);
+            i += 2;
+        } else {
+            heartRate = dataview.getUint8(i, true);
+            i += 1;
+        }
+
+        if(energyExpenditureStatus) {
+            energyExpenditure = dataview.getUint16(i, true);
+            i += 2;
+        }
+
+        if(rrIntervalPresent) {
+            rrInterval = [];
+            while(i <= dataview.byteLength - 2) {
+                rrInterval.push(
+                    dataview.getUint16(i, true) / rrIntervalResolution
+                );
+                i += 2;
+            }
+        }
+
         return {
-            heartRate: readHeartRate(dataview)
+            sensorContactSupported, // Bool
+            sensorContactStatus, // Bool
+            heartRate, // Int
+            energyExpenditure, // Int?
+            rrInterval, // [Float]?
         };
     }
 
     return Object.freeze({
+        rrIntervalResolution,
         decode,
     });
 }

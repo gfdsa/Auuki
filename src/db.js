@@ -3,6 +3,7 @@ import { models } from './models/models.js';
 import { Sound } from './sound.js';
 import { idb } from './storage/idb.js';
 import { ControlMode, } from './ble/enums.js';
+import { TimerStatus, } from './activity/enums.js';
 
 // import { trainerMock } from './simulation-scripts.js';
 
@@ -10,6 +11,7 @@ let db = {
     // Data Screen
     power: models.power.default,
     heartRate: models.heartRate.default,
+    rrInterval: [],
     cadence: models.cadence.default,
     speed: models.speed.default,
     sources: models.sources.default,
@@ -26,6 +28,7 @@ let db = {
     ascent: models.virtualState.ascent,
 
     power1s: models.power1s.default,
+    power3s: models.power3s.default,
     powerInZone: models.powerInZone.default,
 
     powerLap: models.powerLap.default,
@@ -43,6 +46,8 @@ let db = {
     cadenceAvgCount: models.cadenceAvg.count,
     heartRateAvgCount: models.heartRateAvg.count,
 
+    heartRateMax: 0,
+
     // Targets
     powerTarget: models.powerTarget.default,
     resistanceTarget: models.resistanceTarget.default,
@@ -51,22 +56,27 @@ let db = {
 
     mode: models.mode.default,
     page: models.page.default,
+    lock: false,
 
     // Profile
     ftp: models.ftp.default,
     weight: models.weight.default,
     theme: models.theme.default,
+    dockMode: models.dockMode.default,
     measurement: models.measurement.default,
     volume: models.volume.default,
 
     // UI options
     powerSmoothing: 0,
     dataTileSwitch: models.dataTileSwitch.default,
-    librarySwitch: 0,
+    auth: ':login',
 
     // Workouts
     workouts: [],
     workout: models.workout.default,
+
+    // Activities
+    activity: models.activity.default,
 
     // Recording
     records: [],
@@ -83,8 +93,8 @@ let db = {
     stepIndex: 0,
     intervalDuration: 0,
     stepDuration: 0,
-    watchStatus: 'stopped',
-    workoutStatus: 'stopped',
+    watchStatus: TimerStatus.stopped,
+    workoutStatus: TimerStatus.stopped,
 
     // Course
     courseIndex: 0,
@@ -92,7 +102,12 @@ let db = {
     // Request ANT+ Device
     antSearchList: [],
     antDeviceId: {},
+
+    // Services
+    services: {strava: false, intervals: false, trainingPeaks: false},
 };
+
+
 
 xf.create(db);
 
@@ -103,6 +118,14 @@ xf.reg(models.heartRate.prop, (heartRate, db) => {
     db.heartRateAvg = models.heartRateAvg.setState(heartRate);
     db.heartRateLapCount = models.heartRateLap.count;
     db.heartRateAvgCount = models.heartRateAvg.count;
+
+    if(heartRate > db.heartRateMax) {
+        db.heartRateMax = heartRate;
+    }
+});
+
+xf.reg('rrInterval', (rrInterval, db) => {
+    db.rrInterval = rrInterval;
 });
 
 xf.reg(models.power.prop, (power, db) => {
@@ -143,6 +166,11 @@ xf.reg(models.sources.prop, (sources, db) => {
     console.log(db.sources);
 });
 
+xf.reg(models.dockMode.prop, (value, db) => {
+    db.dockMode = models.dockMode.set(value);
+    models.dockMode.backup(db.dockMode);
+});
+
 xf.reg('power1s', (power, db) => {
     db.power1s = power;
 
@@ -152,6 +180,10 @@ xf.reg('power1s', (power, db) => {
 
     db.powerLapCount = models.powerLap.count;
     db.powerAvgCount = models.powerAvg.count;
+});
+
+xf.reg('power3s', (power, db) => {
+    db.power3s = power;
 });
 
 xf.reg('powerInZone', (powerInZone, db) => {
@@ -183,6 +215,8 @@ xf.reg('ui:page-set', (page, db) => {
 
 // Modes
 xf.reg('ui:mode-set', (mode, db) => {
+    if(db.lock) return;
+
     db.mode = models.mode.set(mode);
 
     if(equals(mode, ControlMode.erg)) {
@@ -196,14 +230,19 @@ xf.reg('ui:mode-set', (mode, db) => {
     }
 });
 
+xf.reg('ui:lock-set', (_, db) => {
+    db.lock = !db.lock;
+});
+
+xf.reg('ui:lock-toggle', (_, db) => {
+    db.lock = !db.lock;
+});
+
+
 // UI options
 xf.reg('ui:data-tile-switch-set', (index, db) => {
     db.dataTileSwitch = index;
     models.dataTileSwitch.backup(db.dataTileSwitch);
-});
-
-xf.reg('ui:library-switch-set', (index, db) => {
-    db.librarySwitch = index;
 });
 
 // Targets
@@ -253,6 +292,11 @@ xf.reg('ui:theme-switch', (_, db) => {
     db.theme = models.theme.switch(db.theme);
     models.theme.backup(db.theme);
 });
+
+xf.reg('ui:dock-mode-switch', (_, db) => {
+    db.theme = models.dockMode.switch(db.dockMode);
+    models.dockMode.backup(db.dockMode);
+});
 xf.reg('ui:measurement-switch', (_, db) => {
     db.measurement = models.measurement.switch(db.measurement);
     models.measurement.backup(db.measurement);
@@ -278,33 +322,40 @@ xf.reg('workout', (workout, db) => {
 xf.reg('ui:workout:select', (id, db) => {
     db.workout = models.workouts.get(db.workouts, id);
 });
+xf.reg('ui:planned:select', (id, db) => {
+    db.workout = models.planned.get(id);
+});
 xf.reg('ui:workout:remove', (id, db) => {
     db.workouts = models.workouts.remove(db.workouts, id);
 });
-xf.reg('ui:workout:upload', async function(file, db) {
-    const { result, name } = await models.workout.readFromFile(file);
-    const workout = models.workout.parse(result, name);
-    models.workouts.add(db.workouts, workout);
-    xf.dispatch('db:workouts', db);
+xf.reg('ui:workout:upload', async function(files, db) {
+    for(let file of Object.values(files)) {
+        const { result, name } = await models.workout.readFromFile(file);
+        const workout = models.workout.parse(result, name);
+        models.workouts.add(db.workouts, workout);
+        xf.dispatch('db:workouts', db);
+    }
+
 });
-xf.reg('ui:activity:save', (_, db) => {
+xf.reg('watch:stopped', (_, db) => {
     try {
-        models.workout.save(db);
+        models.activity.createFromCurrent(db);
         xf.dispatch('activity:save:success');
     } catch (err) {
         console.error(`Error on activity save: `, err);
         xf.dispatch('activity:save:fail');
     }
+
 });
 xf.reg('activity:save:success', (e, db) => {
-    // file:download:activity
-    // reset db session:
-    db.records = [];
-    db.events = [];
-    db.laps = [];
-    db.resistanceTarget = 0;
-    db.slopeTarget = 0;
-    db.powerTarget = 0;
+    models.session.reset(db);
+});
+xf.sub('ui:activity:upload:by:id', (id) => {
+    models.activity.upload(id);
+});
+// download the current activity as a .fit file
+xf.reg('ui:activity:save', (_, db) => {
+    xf.dispatch(`ui:page-set`, 'workouts');
 });
 
 xf.reg('course:index', (index, db) => {
@@ -344,38 +395,20 @@ xf.reg(`ant:search:stopped`, (x, db) => {
     db.antSearchList = [];
 });
 
+xf.reg('auth', (x, db) => {
+    // TODO: remove?
+});
 
-// API
-function SignUp() {
-    const url = "http://localhost:8080/api/sign_up";
-    const $form = document.querySelector("#signup--form");
-    $form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        submit();
-    });
+xf.reg('services', (x, db) => {
+    db.services = Object.assign(db.services, x);
+});
 
-    async function submit() {
-        const formData = new FormData($form);
-
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(Object.fromEntries(formData)),
-            });
-
-            const result = await response.json();
-        } catch(error) {
-            console.log(error);
-        }
-    }
-}
-// END API
 
 //
 xf.reg('app:start', async function(_, db) {
+
+    db.dockMode = models.dockMode.set(models.dockMode.restore());
+    models.dockMode.apply(db.dockMode);
 
     db.ftp = models.ftp.set(models.ftp.restore());
     db.weight = models.weight.set(models.weight.restore());
@@ -386,15 +419,16 @@ xf.reg('app:start', async function(_, db) {
 
     db.sources = models.sources.set(models.sources.restore());
 
-    // IndexedDB Schema Version 1
-    // await idb.start('store', 1, ['session']);
-    // IndexedDB Schema Version 2
-    await idb.start('store', 2, ['session', 'workouts']);
+    // IndexedDB Schema Version 3
+    await idb.start('store', 3, ['session', 'workouts', 'activity']);
     db.workouts = await models.workouts.restore();
+    db.activity = await models.activity.restore();
     db.workout = models.workout.restore(db);
+    models.planned.restore();
 
     await models.session.restore(db);
     xf.dispatch('workout:restore');
+    xf.dispatch('activity:restore');
 
     models.kcal.restore(db);
     models.powerLap.restore(db);
@@ -407,7 +441,10 @@ xf.reg('app:start', async function(_, db) {
     const sound = Sound({volume: db.volume});
     sound.start();
 
-    // SignUp();
+    models.api.start();
+    // TODO: remove
+    // xf.dispatch(`ui:page-set`, 'workouts');
+
     // TRAINER MOCK
     // trainerMock.init();
 });
@@ -417,13 +454,13 @@ function start () {
     xf.dispatch('db:start');
 
     // UI test
-    // setTimeout(function() {
+    // setInterval(function() {
     //     xf.dispatch('watch:elapsed', 1);
     //     xf.dispatch('power', 180);
     //     xf.dispatch('cadence', 80);
-    //     xf.dispatch('heartRate', 130);
-    //     xf.dispatch('smo2', 83.17);
-    //     xf.dispatch('thb', 11.14);
+    //     xf.dispatch('heartRate', 140 + (Math.random() * 10));
+    //     xf.dispatch('smo2', 71.17); // + (Math.random() * 10));
+    //     xf.dispatch('thb', 11.14); // + (Math.random() / 2));
     //     xf.dispatch('coreBodyTemperature', 38.12);
     //     xf.dispatch('skinTemperature', 38.47);
     // }, 1000);
@@ -433,3 +470,4 @@ function start () {
 start();
 
 export { db };
+

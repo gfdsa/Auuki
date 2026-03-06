@@ -55,12 +55,16 @@ function Power(args = {}) {
 
 function Slope(args = {}) {
     function encode(num) {
-        let value = toFixed(num, 1);
-        if(!exists(value) || isNaN(value)) return '-';
-        return `${value}%`;
+        let value = parseFloat(num);
+        if(!exists(value) || isNaN(value)) {
+            return '-';
+        }
+        return `${toFixed(value, 1)}%`;
     }
     function decode(str) {
-        return parseFloat(toNumericString(str));
+        let value = parseFloat(toNumericString(str));
+        if(isNaN(value)) return undefined;
+        return value;
     }
     return Object.freeze({
         encode,
@@ -75,7 +79,9 @@ function Cadence(args = {}) {
         return `${value}`;
     }
     function decode(str) {
-        return parseInt(toNumericString(str));
+        let value = parseInt(toNumericString(str));
+        if(isNaN(value)) return undefined;
+        return value;
     }
     return Object.freeze({
         encode,
@@ -139,13 +145,11 @@ function Row(args = {}) {
 
     function setSlope(value) {
         const slope = fields.slope.decode(value);
-        if(isNaN(slope)) return;
         state.slope = slope;
     }
 
     function setCadence(value) {
         const cadence = fields.cadence.decode(value);
-        if(isNaN(cadence)) return;
         state.cadence = cadence;
     }
 
@@ -303,7 +307,7 @@ function Editor() {
     let workout = {
         meta: {
             name: 'New Workout',
-            author: 'Flux',
+            author: 'Auuki',
             category: 'SweetSpot',
             description: 'Best workout ever!',
             type: 'bike',
@@ -684,7 +688,7 @@ class WorkoutEditor extends HTMLElement {
         const file = this.editor.format({format: 'zwo'});
         const name = `${this.editor.getName()}.zwo`;
         console.log(file);
-        fileHandler.saveFile()(new Blob([file], {type: 'text/plain'}), name);
+        fileHandler.download()(file, name, fileHandler.Type.TextPlain);
     }
 }
 

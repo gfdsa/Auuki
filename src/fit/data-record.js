@@ -46,12 +46,22 @@ function DataRecord(args = {}) {
         return definition.fields.reduce(function(acc, field) {
             const _field = profiles.numberToField(definition.name, field.number);
             const value  = data.fields[_field.name];
+            const size = field.size;
+            const base_type_size = profiles.baseTypeToSize(field.base_type);
 
             if(type.string.isString(field.base_type)) {
+                // string
                 type.string.encode(field, value, view, acc.i, endian);
+            } else if(size > base_type_size) {
+                // array
+                for(let j = 0, k = 0; j < size; j+=base_type_size, k+=1) {
+                    type.number.encode(_field, value[k], view, acc.i+j, endian, value % 0xFF === 0);
+                }
             } else if(type.timestamp.isTimestamp(_field.type)) {
+                // timestamp
                 type.timestamp.encode(field, value, view, acc.i, endian);
             } else {
+                // number
                 type.number.encode(_field, value, view, acc.i, endian);
             }
 
@@ -96,14 +106,26 @@ function DataRecord(args = {}) {
                 const _field = profiles.numberToField(
                     definition.name, field.number
                 );
+                const size = field.size;
+                const base_type_size = profiles.baseTypeToSize(field.base_type);
 
                 let value;
 
                 if(type.string.isString(field.base_type)) {
+                    // string
                     value = type.string.decode(field, view, acc.i, endian);
+                } else if(size > base_type_size) {
+                    // array
+                    value = [];
+                    for(let j = 0; j < size; j+=base_type_size) {
+                        const v = type.number.decode(_field, view, acc.i+j, endian);
+                        value.push(v);
+                    }
                 } else if(type.timestamp.isTimestamp(_field.type)) {
+                    // timestamp
                     value = type.timestamp.decode(field, view, acc.i, endian);
                 } else {
+                    // number
                     value = type.number.decode(_field, view, acc.i, endian);
                 }
 

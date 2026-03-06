@@ -197,7 +197,7 @@ function RequestControl() {
         const view   = new DataView(buffer);
         view.setUint8(0, opCode, true);
 
-        print.log(`rx: ftms: request-control:'`);
+        print.log(`rx: ftms: request-control:`);
 
         return view.buffer;
     }
@@ -224,7 +224,7 @@ function Reset() {
         const view   = new DataView(buffer);
         view.setUint8(0, opCode, true);
 
-        print.log(`rx: ftms: reset:'`);
+        print.log(`rx: ftms: reset:`);
 
         return view.buffer;
     }

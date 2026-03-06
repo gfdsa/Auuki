@@ -27,23 +27,23 @@ let workouts = [
     <author>Marinov</author>
     <name>Chili Pepper</name>
     <category>VO2 Max</category>
-    <description> NOTE: This is mixed mode workout with Slope targets in the main interval groups. 40/20s or 40 sec ON at 121% of FTP followed by 20 sec OFF, in 2 groups by 10 reps each.</description>
+    <description> NOTE: This is mixed mode workout with slope targets in the main interval groups. 40/20s or 40 sec ON at 121% of FTP followed by 20 sec OFF, in 2 groups by 10 reps each.</description>
     <sportType>bike</sportType>
     <tags>
     </tags>
     <workout>
         <Warmup Duration="120" PowerLow="0.32" PowerHigh="0.39"/>
-        <SteadyState Duration="60" Power="0.39" Cadence="80"/>
-        <SteadyState Duration="60" Power="0.47" Cadence="90"/>
-        <SteadyState Duration="60" Power="0.55" Cadence="100"/>
-        <SteadyState Duration="60" Power="0.63" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.39" Cadence="80"/>
+        <SteadyState Duration="45" Power="0.47" Cadence="90"/>
+        <SteadyState Duration="45" Power="0.55" Cadence="100"/>
+        <SteadyState Duration="45" Power="0.63" Cadence="90"/>
         <IntervalsT Repeat="2" OnDuration="30" OffDuration="30" OnPower="0.98" OffPower="0.63" Cadence="100" CadenceResting="80"/>
-        <SteadyState Duration="120" Power="0.5" Slope="1"/>
-        <IntervalsT Repeat="10" OnDuration="40" OffDuration="20" OnPower="1.21" OffPower="0.44" OnSlope="4" OffSlope="0" Cadence="90" CadenceResting="80"/>
-        <SteadyState Duration="300" Power="0.40" Slope="1"/>
-        <IntervalsT Repeat="10" OnDuration="40" OffDuration="20" OnPower="1.21" OffPower="0.44" OnSlope="4" OffSlope="0"/>
-        <SteadyState Duration="300" Power="0.40"/>
-        <Cooldown Duration="300" PowerLow="0.39" PowerHigh="0.32" />
+        <SteadyState Duration="90" Power="0.5" Slope="1"/>
+        <IntervalsT Repeat="6" OnDuration="40" OffDuration="20" OnPower="1.21" OffPower="0.44" OnSlope="4" OffSlope="0" Cadence="90" CadenceResting="80"/>
+        <SteadyState Duration="180" Power="0.40" Slope="1"/>
+        <IntervalsT Repeat="6" OnDuration="40" OffDuration="20" OnPower="1.21" OffPower="0.44" OnSlope="4" OffSlope="0"/>
+        <SteadyState Duration="180" Power="0.40"/>
+        <Cooldown Duration="210" PowerLow="0.39" PowerHigh="0.32" />
     </workout>
 </workout_file>
 `,
@@ -110,10 +110,133 @@ let workouts = [
 </workout_file>
 `,
 `<workout_file>
+    <author>Auuki</author>
+    <name>Quiche</name>
+    <category>HIIT</category>
+    <description>This workout features three 6-minute intervals that train your body to better manage and tolerate lactate buildup. You'll begin 'at' your FTP, increase to Zone 5 intensity (over), then finish with a Zone 3 effort (under).</description>
+    <sportType>bike</sportType>
+    <tags>
+    </tags>
+    <workout>
+        <Warmup Duration="300" PowerLow="0.25" PowerHigh="0.966"/>
+        <SteadyState Duration="120" Power="0.5"/>
+        <SteadyState Duration="120" Power="0.901"/>
+        <SteadyState Duration="120" Power="1.053"/>
+        <SteadyState Duration="120" Power="0.763"/>
+        <SteadyState Duration="120" Power="0.5"/>
+        <SteadyState Duration="120" Power="0.901"/>
+        <SteadyState Duration="120" Power="1.053"/>
+        <SteadyState Duration="120" Power="0.763"/>
+        <SteadyState Duration="120" Power="0.5"/>
+        <SteadyState Duration="120" Power="0.901"/>
+        <SteadyState Duration="120" Power="1.053"/>
+        <SteadyState Duration="120" Power="0.763"/>
+        <SteadyState Duration="120" Power="0.5"/>
+        <Cooldown Duration="180" PowerLow="0.75" PowerHigh="0.25"/>
+    </workout>
+</workout_file>`
+,
+`<workout_file>
+    <author>Auuki</author>
+    <name>Quiche +1</name>
+    <category>HIIT</category>
+    <description>This workout features two sets with 5 intervals each that train your body to better manage and tolerate lactate buildup. You'll begin 'at' your FTP, increase to Zone 5 intensity (over), then finish with a Zone 3 effort (under).</description>
+    <sportType>bike</sportType>
+    <tags>
+    </tags>
+    <workout>
+        <Warmup Duration="300" PowerLow="0.25" PowerHigh="0.966"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="180" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <SteadyState Duration="45" Power="0.901"/>
+        <SteadyState Duration="45" Power="1.053"/>
+        <SteadyState Duration="45" Power="0.763"/>
+        <SteadyState Duration="60" Power="0.5"/>
+        <Cooldown Duration="270" PowerLow="0.75" PowerHigh="0.25"/>
+    </workout>
+</workout_file>`
+,
+`<workout_file>
+    <author>Auuki</author>
+    <name>Salad</name>
+    <category>HIIT</category>
+    <description>This workout uses pyramid-structured intervals that gradually build up to your FTP threshold. These efforts enhance your body's capacity to metabolize exercise byproducts—such as lactate and convert them into usable fuel for your cardiovascular system.</description>
+    <sportType>bike</sportType>
+    <tags>
+    </tags>
+    <workout>
+        <SteadyState Duration="90" Power="0.604"/>
+        <SteadyState Duration="90" Power="0.704"/>
+        <SteadyState Duration="90" Power="0.814"/>
+        <SteadyState Duration="90" Power="0.904"/>
+        <SteadyState Duration="60" Power="0.504"/>
+        <SteadyState Duration="45" Power="1.054"/>
+        <SteadyState Duration="60" Power="0.604"/>
+        <SteadyState Duration="45" Power="1.104"/>
+        <SteadyState Duration="60" Power="0.554"/>
+        <SteadyState Duration="45" Power="1.154"/>
+        <SteadyState Duration="60" Power="0.504"/>
+        <SteadyState Duration="120" Power="0.654"/>
+        <SteadyState Duration="120" Power="0.814"/>
+        <SteadyState Duration="120" Power="0.884"/>
+        <SteadyState Duration="45" Power="1.004"/>
+        <SteadyState Duration="90" Power="0.654"/>
+        <SteadyState Duration="45" Power="1.004"/>
+        <SteadyState Duration="120" Power="0.884"/>
+        <SteadyState Duration="120" Power="0.814"/>
+        <SteadyState Duration="120" Power="0.504"/>
+        <SteadyState Duration="125" Power="0.814"/>
+        <SteadyState Duration="120" Power="0.884"/>
+        <SteadyState Duration="45" Power="1.004"/>
+        <SteadyState Duration="90" Power="0.654"/>
+        <SteadyState Duration="45" Power="1.004"/>
+        <SteadyState Duration="120" Power="0.884"/>
+        <SteadyState Duration="120" Power="0.814"/>
+        <SteadyState Duration="120" Power="0.504"/>
+        <Cooldown Duration="280" PowerLow="0.754" PowerHigh="0.504"/>
+    </workout>
+</workout_file>`
+,
+`<workout_file>
     <author>Marinov</author>
     <name>Pasta</name>
     <category>Threshold</category>
-    <description>A Classic 2 times 20 min at almost FTP. Make sure you had some pasta before this session. You will need it!</description>
+    <description>A classic 2 times 20 min at almost FTP. Make sure you had some pasta before this session. You will need it!</description>
     <sportType>bike</sportType>
     <tags>
     </tags>
@@ -135,9 +258,9 @@ let workouts = [
 ,
 `<workout_file>
     <author>Marinov</author>
-    <name>Potato Chips</name>
+    <name>Potato Chips +1</name>
     <category>Threshold</category>
-    <description>5 by 5 min at 100% of FTP with 5 min recovery in between. Perfect to get you accustome to first intensite sessions after a base block, or just that new FTP value.</description>
+    <description>5 by 5 min at 100% of FTP with 5 min recovery in-between. Perfect to get you accustomed to your first intensive sessions after a base block, or just that new FTP value.</description>
     <sportType>bike</sportType>
     <tags>
     </tags>
@@ -153,9 +276,27 @@ let workouts = [
 ,
 `<workout_file>
     <author>Marinov</author>
+    <name>Potato Chips</name>
+    <category>Threshold</category>
+    <description>3 by 3 min at 100% of FTP with 3 min recovery in-between. Perfect to get you accustomed to your first intensive sessions after a base block, or just that new FTP value.</description>
+    <sportType>bike</sportType>
+    <tags>
+    </tags>
+    <workout>
+        <SteadyState Duration="300" Power="0.39"/>
+        <SteadyState Duration="120" Power="0.60"/>
+        <IntervalsT Repeat="2" OnDuration="30" OffDuration="30" OnPower="0.98" OffPower="0.5"/>
+        <SteadyState Duration="120" Power="0.56"/>
+        <IntervalsT Repeat="3" OnDuration="180" OffDuration="180" OnPower="1" OffPower="0.5"/>
+        <SteadyState Duration="300" Power="0.39"/>
+    </workout>
+</workout_file>`
+,
+`<workout_file>
+    <author>Marinov</author>
     <name>Maple</name>
     <category>Sweet Spot</category>
-    <description>4 times 10 min Sweet Spot intervals with 5 min recovery in between and warm-up Ramp.</description>
+    <description>4 times 10 min sweet spot intervals with 5 min recovery in-between and warm-up ramp.</description>
     <sportType>bike</sportType>
     <tags>
         <tag name="sweet"/>
@@ -174,7 +315,7 @@ let workouts = [
     <author>Marinov</author>
     <name>Honey</name>
     <category>Sweet Spot</category>
-    <description>4 times 10 min Sweet Spot intervals with 5 min recovery in between.</description>
+    <description>3 times 15 min sweet spot intervals with 5 min recovery in-between.</description>
     <sportType>bike</sportType>
     <workout>
         <Warmup Duration="300" PowerLow="0.32" PowerHigh="0.75"/>
@@ -189,7 +330,7 @@ let workouts = [
     <author>Marinov</author>
     <name>Baguette</name>
     <category>Base</category>
-    <description>The bread and butter of Endurance training with efforts in Zone 1 and 2.</description>
+    <description>The bread and butter of endurance training with efforts in Zone 1 and 2.</description>
     <sportType>bike</sportType>
     <tags>
     </tags>
@@ -212,7 +353,7 @@ let workouts = [
     <author>Marinov</author>
     <name>Baguette +1</name>
     <category>Base</category>
-    <description>The bread and butter of Endurance training, with efforts in Zone 2.</description>
+    <description>The bread and butter of endurance training, with efforts in Zone 2.</description>
     <sportType>bike</sportType>
     <tags>
     </tags>
@@ -236,11 +377,11 @@ let workouts = [
 </workout_file>`
 ,
 `<workout_file>
-    <author>Flux</author>
+    <author>Auuki</author>
     <name>Salmon</name>
     <category>Base</category>
     <subcategory></subcategory>
-    <description>The Fat Max workout to push your aerobic base up</description>
+    <description>The fat max workout to push your aerobic base up.</description>
     <sporttype>bike</sporttype>
     <tags></tags>
     <workout>
@@ -253,11 +394,11 @@ let workouts = [
     </workout>
 </workout_file>`,
 `<workout_file>
-    <author>Flux</author>
+    <author>Auuki</author>
     <name>Salmon +1</name>
     <category>Base</category>
     <subcategory></subcategory>
-    <description>The Fat Max workout to push your aerobic base up</description>
+    <description>The fat max workout to push your aerobic base up.</description>
     <sporttype>bike</sporttype>
     <tags></tags>
     <workout>
@@ -271,7 +412,7 @@ let workouts = [
     </workout>
 </workout_file>`,
 `<workout_file>
-    <author>Marinov</author>
+    <author>Auuki</author>
     <name>Blackcurrant</name>
     <category>Recovery</category>
     <description>A recovery ride in zone 1 at 50% of FTP.</description>
@@ -284,11 +425,11 @@ let workouts = [
     </workout>
 </workout_file>`,
 `<workout_file>
-    <author>Flux</author>
+    <author>Auuki</author>
     <name>5-1-5 Moxy Test</name>
     <category>Test</category>
-    <subcategory></subcategory>
-    <description>It's important to not warm-up before the test. You should not cycle during the rest intervals, since they are meant to track SmO2 and THb recovery rate. You are ment to fail in the any of the last 3 steps. Use the moxy academy course for guidence on how to analyze. Muscle Oxygen Zone Assessment: https://moxy-academy.teachable.com/courses/209052/lectures/3480785.
+    <subcategory>Moxy 515</subcategory>
+    <description>This Assessment identifies an athlete's physiological limiters using muscle oxygen sensors through a series of 5 minute work intervals followed by 1 minute rests. It's important to not warm-up before the test. You should not cycle during the rest intervals, since they are meant to track SmO2 and THb recovery rate. You are meant to fail in any of the last 3 steps. Use the Moxy Academy course for guidence on how to analyze. Muscle Oxygen Zone Assessment: https://moxy-academy.teachable.com/courses/209052/lectures/3480785.
 </description>
     <sporttype>bike</sporttype>
     <tags></tags>
@@ -315,10 +456,11 @@ let workouts = [
     </workout>
 </workout_file>`,
 `<workout_file>
-    <author>Flux</author>
+    <author>Auuki</author>
     <name>Ramp Test</name>
-    <category>Ramp Test</category>
-    <description>Ramp test proceeding in steps of 6% of previous FTP for 60 seconds. Do until exhoustion and take 75% of the power you did in the last interval you’ve reached. That's your new FTP.</description>
+    <category>Test</category>
+    <subcategory>Power Ramp</subcategory>
+    <description>Ramp test proceeding in steps of 6% of previous FTP for 60 seconds. Do until exhaustion and take 75% of the power you did in the last interval you’ve reached. That's your new FTP.</description>
     <sportType>bike</sportType>
     <tags>
     </tags>

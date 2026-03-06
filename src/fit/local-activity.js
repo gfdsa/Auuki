@@ -40,6 +40,28 @@ function LocalActivity(args = {}) {
         };
     }
 
+    // [Record] -> Record?
+    function findFirstRecord(records = []) {
+        for(let i = 0; i < records.length; i+=1) {
+            if(records[i].timestamp !== undefined) {
+                return records[i];
+            }
+        }
+        console.error(`:fit :records 'has no valid records'`);
+        return records[0];
+    }
+
+    // [Record] -> Record?
+    function findLastRecord(records = []) {
+        for(let i = records.length-1; i >= 0 ; i-=1) {
+            if(records[i].timestamp !== undefined) {
+                return records[i];
+            }
+        }
+        console.error(`:fit :records 'has no valid records'`);
+        return records[0];
+    }
+
     // {records: [Record], events: [Event]} -> Int
     function calcTotalTimerTime(args) {
         const records = args.records ?? [];
@@ -50,8 +72,9 @@ function LocalActivity(args = {}) {
             if(records.length > 1) {
                 // if no events are recorded fallback to first and last record
                 return type.timestamp.elapsed(
-                    first(records)?.timestamp,
-                    last(records)?.timestamp,
+                    // TODO: handle record is not guaranteed to be a Record
+                    findFirstRecord(records)?.timestamp,
+                    findLastRecord(records)?.timestamp
                 );
             } else {
                 // if no events are recorded and no more than one record return 0
@@ -90,13 +113,30 @@ function LocalActivity(args = {}) {
             return 0;
         }
 
-        const start_time = first(events)?.timestamp ?? first(records)?.timestamp;
-        const timestamp = last(laps)?.timestamp ?? last(records)?.timestamp;
+        const start_time = first(events)?.timestamp ?? findFirstRecord(records)?.timestamp;
+        const timestamp = last(laps)?.timestamp ?? findLastRecord(records)?.timestamp;
 
         return type.timestamp.elapsed(start_time, timestamp);
     }
 
-    // Lap -> Int
+
+
+    // {
+    //     timestamp: Int,
+    //     start_time: Int,
+    //     totalElapsedTime: Int,
+    //     avgPower: Int,
+    //     maxPower: Int,
+    //     avgCadence: Double,
+    //     avgHeartRate: Double,
+    //     saturated_hemoglobin_percent: Double,
+    //     total_hemoglobin_conc: Double,
+    //     core_temperature: Double,
+    //     skin_temperature: Double
+    // },
+    // [{ timestamp: Int, type: EventType, }]
+    // ->
+    // Int
     function calcLapTotalTimerTime(lap, events) {
         const _lap = expect(lap, `calcLapTotalTimerTime needs lap: Lap.`);
         const _events = events ?? [];
@@ -128,7 +168,22 @@ function LocalActivity(args = {}) {
         return elapsedTime - Math.max(0, Math.min(pausedTime, elapsedTime));
     }
 
-    // Lap -> Int
+
+    // {
+    //     timestamp: Int,
+    //     start_time: Int,
+    //     totalElapsedTime: Int,
+    //     avgPower: Int,
+    //     maxPower: Int,
+    //     avgCadence: Double,
+    //     avgHeartRate: Double,
+    //     saturated_hemoglobin_percent: Double,
+    //     total_hemoglobin_conc: Double,
+    //     core_temperature: Double,
+    //     skin_temperature: Double
+    // },
+    // ->
+    // Int
     function calcLapTotalElapsedTime(lap) {
         return type.timestamp.elapsed(lap.start_time, lap.timestamp);
     }
@@ -155,11 +210,13 @@ function LocalActivity(args = {}) {
             max_cadence: 0,
             max_speed: 0,
             max_heart_rate: 0,
-            total_distance: last(records)?.distance ?? 0,
+            total_distance: findLastRecord(records)?.distance ?? 0,
             total_calories: 0,
         };
 
-        const stats = records.reduce(function(acc, record, _, { length }) {
+        const stats = records
+              .filter(record => record.timestamp !== undefined)
+              .reduce(function(acc, record, _, { length }) {
             acc.avg_power      += record.power / length;
             acc.avg_cadence    += record.cadence / length;
             acc.avg_speed      += record.speed / length;
@@ -171,12 +228,59 @@ function LocalActivity(args = {}) {
             return acc;
         }, defaultStats);
 
-        stats.total_calories = Math.floor(stats.avg_power * total_timer_time / 1000);
+        stats.total_calories = Math.floor(stats.avg_power * total_timer_time * 0.001);
         stats.avg_power = Math.floor(stats.avg_power);
         stats.avg_cadence = Math.floor(stats.avg_cadence);
         stats.avg_heart_rate = Math.floor(stats.avg_heart_rate);
 
         return stats;
+    }
+
+    function timestampToDate(x) {
+        const timeKeys = ['time_created', 'start_time', 'timestamp'];
+        for(let timeKey of timeKeys) {
+            if(x[timeKey]) {
+                x[timeKey] = new Date(x[timeKey]);
+            }
+        }
+        return x;
+    }
+
+    function printAppData(records, laps, events) {
+        const _records = window.structuredClone(records);
+        const _laps = window.structuredClone(laps);
+        const _events = window.structuredClone(events);
+        console.log('----');
+        console.log('records');
+        console.log(_records.map(timestampToDate));
+        // console.log(records);
+        console.log('laps');
+        console.log(_laps.map(timestampToDate));
+        // console.log(laps);
+        console.log('events');
+        console.log(_events.map(timestampToDate));
+        // console.log(events);
+        console.log('----');
+    }
+
+    function printFITjs(structure) {
+        const select = ['record', 'event', 'lap', 'session', 'activity'];
+
+        console.log('----');
+        const _structure = window.structuredClone(structure);
+        const _filtered = [];
+        for(let record of _structure) {
+            if(record.type === "data") {
+                if(record.fields) {
+                    timestampToDate(record.fields);
+                }
+                if(select.includes(record.name)) {
+                    _filtered.push(record);
+                }
+            }
+        }
+        console.log(_filtered);
+        console.log('----');
     }
 
     // {records: [{<field>: Any}], laps: [{<field>: Any}]}
@@ -186,9 +290,12 @@ function LocalActivity(args = {}) {
         const records = args.records ?? [];
         const laps = args.laps ?? [];
         const events = args.events ?? [];
+        const ftp = args.ftp ?? 200;
 
-        const activity_start_time = first(events)?.start_time ?? first(records).timestamp;
-        const time_created = last(laps)?.timestamp ?? last(records)?.timestamp;
+        // printAppData(records, laps, events);
+
+        const activity_start_time = first(events)?.start_time ?? findFirstRecord(records).timestamp;
+        const time_created = last(laps)?.timestamp ?? findLastRecord(records)?.timestamp;
         const timestamp    = time_created;
         const total_elapsed_time = calcTotalElapsedTime({records, laps, events});
         const total_timer_time = calcTotalTimerTime({records, events});
@@ -224,10 +331,15 @@ function LocalActivity(args = {}) {
 
             // definition record
             definitions.record,
+            // definition hrv
+            definitions.hrv,
             // data record messages
-            ...records.map((record) => dataRecord.toFITjs(
-                definitions.record, record
-            )),
+            ...records.map((record) =>
+                dataRecord.toFITjs(
+                    record.time === undefined ? definitions.record : definitions.hrv,
+                    record
+                )
+            ),
 
             // definition events
             definitions.event,
@@ -268,6 +380,7 @@ function LocalActivity(args = {}) {
                     total_elapsed_time,
                     total_timer_time,
                     stats,
+                    threshold_power: ftp,
                 })
             ),
 
@@ -289,6 +402,8 @@ function LocalActivity(args = {}) {
 
         const header = first(structure);
         header.dataSize = getSize(structure).dataSize;
+
+        // printFITjs(structure);
 
         return structure;
     }
@@ -373,12 +488,13 @@ function Session(args = {}) {
             args.total_timer_time,
             'Session needs total_timer_time'
         ),
-        message_index:      args.message_index,
+        message_index:      args.message_index ?? 0,
         sport:              profiles.types.sport.values.cycling,
         sub_sport:          profiles.types.sub_sport.values.virtual_activity,
         ...args.stats,
         first_lap_index:    0,
-        num_laps:           args.num_laps,
+        num_laps:           args.laps?.length ?? 1,
+        threshold_power:    args.threshold_power,
     };
 }
 // END Special Data Messages

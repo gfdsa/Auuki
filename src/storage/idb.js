@@ -40,13 +40,14 @@ function IDB(args = {}) {
         return new Promise((resolve, reject) => {
             openReq.onupgradeneeded = function(e) {
                 setDB(openReq.result);
-                console.log(`:idb :version ${db.version}`);
+                console.log(`:idb :version ${db.version} :old ${e.oldVersion}`);
 
                 switch(e.oldVersion) {
                 // switch(db.version) {
                 case 0: createStores(storeNames);
                 case 1: update(storeNames);
-                case 2: latest(storeNames);
+                case 2: update(storeNames);
+                case 3: latest(storeNames);
                 }
             };
             openReq.onerror = function() {
@@ -149,7 +150,8 @@ function IDB(args = {}) {
             if(!exists(id)) {
                 id = uuid();
             };
-            Object.assign(item, {id: id});
+            item.id = id;
+            console.log(`:idb :setId`, id);
         }
         return item;
     }

@@ -5,6 +5,7 @@ const services = {
     cyclingPower:        '00001818-0000-1000-8000-00805f9b34fb',
     heartRate:           '0000180d-0000-1000-8000-00805f9b34fb',
     speedCadence:        '00001816-0000-1000-8000-00805f9b34fb',
+    battery:             '0000180f-0000-1000-8000-00805f9b34fb',
     fec:                 '6e40fec1-b5a3-f393-e0a9-e50e24dcca9e',
     wahooFitnessMachine: 'a026ee0b-0a7d-4ab3-97fa-f1500f9feb8b',
     raceController:      '00000001-19ca-4651-86e5-fa29dcdd09d1',
@@ -37,6 +38,7 @@ const characteristics = {
 
     // Battery
     batteryLevel:                  '00002a19-0000-1000-8000-00805f9b34fb',
+    batteryLevelStatus:            '00002bed-0000-1000-8000-00805f9b34fb',
 
     // Device Information
     manufacturerNameString:        '00002a29-0000-1000-8000-00805f9b34fb',
@@ -88,25 +90,28 @@ function Filters() {
     function powerMeter() {
         return {
             filters: [{services: [uuids.cyclingPower]}],
+            optionalServices: [uuids.battery]
         };
     }
 
     function speedCadenceSensor() {
         return {
             filters: [{services: [uuids.speedCadence]}],
+            optionalServices: [uuids.speedCadence, uuids.battery]
         };
     }
 
     function heartRateMonitor() {
         return {
             filters: [{services: [uuids.heartRate]}],
-            optionalServices: [uuids.speedCadence]
+            optionalServices: [uuids.speedCadence, uuids.battery]
         };
     }
 
     function smo2() {
         return {
             filters: [{services: [uuids.smo2]}],
+            optionalServices: [uuids.battery]
         };
     }
 
@@ -116,6 +121,7 @@ function Filters() {
                 {services: [uuids.coreTemp]},
                 {services: [uuids.corePrivate]},
             ],
+            optionalServices: [uuids.battery]
         };
     }
 
