@@ -852,6 +852,22 @@ class PowerValue extends DataView {
 
 customElements.define('power-value', PowerValue);
 
+class AdjPowerTarget extends DataView {
+    getDefaults() {
+        return {
+            prop: 'db:adjPowerTarget',
+        };
+    }
+    subs() {
+        xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
+    }
+    transform(state) {
+        return Math.round(state);
+    }
+}
+
+customElements.define('adj-power-target', AdjPowerTarget);
+
 class PowerAvg extends DataView {
     getDefaults() {
         return {

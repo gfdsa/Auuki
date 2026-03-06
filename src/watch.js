@@ -1,4 +1,4 @@
-import { equals, exists, empty, first, last, xf, avg, max, toFixed, print, } from './functions.js';
+import { equals, exists, empty, first, last, xf, avg, max, toFixed, print, rand, } from './functions.js';
 import { kphToMps, mpsToKph, timeDiff, pad } from './utils.js';
 import { models } from './models/models.js';
 import { ControlMode, } from './ble/enums.js';
@@ -6,6 +6,120 @@ import { TimerStatus, EventType, } from './activity/enums.js';
 
 // const timer = new Worker('./timer.js');
 const timer = new Worker(new URL('./timer.js', import.meta.url));
+
+// For testing only.
+class PowerGenerator {
+    constructor() {
+        this.offsetLow = 2;
+        this.offsetHigh = 11;
+        this.powerTarget = 0;
+        this.init();
+    }
+    init() {
+        xf.sub('db:adjPowerTarget', this.setPowerTarget.bind(this));
+        setInterval(this.onInterval.bind(this), 1000);
+    }
+    setPowerTarget(power) {
+        if(power >= 0) {
+            this.powerTarget = power;
+            print.log(`setPowerTarget: ${this.powerTarget}`);
+        }
+    }
+    getPower() {
+        const bad_power = rand(0, this.powerTarget);
+        if(bad_power < this.powerTarget / 50) return bad_power;
+        const power = rand(this.powerTarget + this.offsetLow, this.powerTarget + this.offsetHigh);
+        return power > 0 ? power : 0;
+    }
+    onInterval() {
+        if(this.powerTarget > 0) {
+            xf.dispatch('power', this.getPower());
+        }
+    }
+}
+
+//const powerGenerator = new PowerGenerator();
+
+xf.reg('adjPowerTarget', (powerTarget, db) => {
+    db.adjPowerTarget = models.powerTarget.set(powerTarget);
+});
+
+class PowerMatcher {
+    constructor() {
+        // Settings.
+        this.initialAdjustment = -10;   // in watts
+        this.adjustmentInterval = 5;    // in seconds
+        this.adjustmentStep = 1;        // in watts
+        this.maxAdjustment = this.adjustmentStep * 25; // in watts
+        this.forgetThreshold = 0.1;     // percentage of a power target
+        // State.
+        this.adjustedPowerTarget = 0;
+        this.powerTarget = 0;
+        this.recentPower = [];
+        this.intervalPower = [];
+        this.init();
+    }
+    init() {
+        xf.sub('db:power', this.onPower.bind(this));
+        xf.sub('db:powerTarget', this.onPowerTarget.bind(this));
+    }
+    incPower() {
+        this.adjustedPowerTarget += this.adjustmentStep;
+        if (this.adjustedPowerTarget > this.powerTarget + this.maxAdjustment) {
+            this.adjustedPowerTarget = this.powerTarget + this.maxAdjustment;
+        }
+        this.recentPower = [];
+        xf.dispatch('adjPowerTarget', this.adjustedPowerTarget);
+    }
+    decPower() {
+        this.adjustedPowerTarget -= this.adjustmentStep;
+        if (this.adjustedPowerTarget < this.powerTarget - this.maxAdjustment) {
+            this.adjustedPowerTarget = this.powerTarget - this.maxAdjustment;
+        }
+        this.recentPower = [];
+        xf.dispatch('adjPowerTarget', this.adjustedPowerTarget);
+    }
+    onPower(power) {
+        const forgetThreshold = Math.round(this.powerTarget * this.forgetThreshold);
+        if(power < forgetThreshold) {
+            print.log(`power: ${power} is lower than forgetThreshold: ${forgetThreshold}, resetting history`);
+            this.recentPower = [];
+            this.intervalPower = [];
+        } else {
+            this.recentPower.push(power);
+            this.intervalPower.push(power);
+            if(this.recentPower.length >= this.adjustmentInterval) {
+                while(this.recentPower.length > this.adjustmentInterval) {
+                    this.recentPower.shift();
+                }
+                const avgRecentPower = Math.round(avg(this.recentPower));
+                const avgIntervalPower = Math.round(avg(this.intervalPower));
+                print.log(`avgRecentPower: ${avgRecentPower} avgIntervalPower: ${avgIntervalPower} target: ${this.powerTarget}`)
+                if(avgIntervalPower > this.powerTarget && avgRecentPower >= this.powerTarget) {
+                    this.decPower();
+                } else if(avgIntervalPower < this.powerTarget && avgRecentPower <= this.powerTarget) {
+                    this.incPower();
+                } else if (avgIntervalPower == this.powerTarget) {
+                    if(avgRecentPower > this.powerTarget) {
+                        this.decPower();
+                    } else if (avgRecentPower < this.powerTarget) {
+                        this.incPower();
+                    }
+                }
+            }
+        }
+    }
+    onPowerTarget(power) {
+        print.log(`onPowerTarget called: ${power}`);
+        this.adjustedPowerTarget = power + this.initialAdjustment;
+        this.powerTarget = power;
+        this.recentPower = [];
+        this.intervalPower = [];
+        xf.dispatch('adjPowerTarget', this.adjustedPowerTarget);
+    }
+}
+
+const powerMatcher = new PowerMatcher();
 
 class Watch {
     constructor(args) {

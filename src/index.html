@@ -43,6 +43,11 @@
                                 <div class="connection-switch--label">Controllable</div>
                             </connection-switch>
 
+                            <connection-switch for="ble:powerMeter" id="switch-power-meter" class="connection-switch">
+                                <div class="connection-switch--indicator off"></div>
+                                <div class="connection-switch--label">Power Meter</div>
+                            </connection-switch>
+
                             <connection-switch for="ble:heartRateMonitor" id="switch-hrm" class="connection-switch">
                                 <div class="connection-switch--indicator off"></div>
                                 <div class="connection-switch--label">HRM</div>
@@ -53,6 +58,13 @@
                             <div class="data-tile--small wide" id="data-tile--power-avg">
                                 <z-stack data-key="kcalZStack">
                                     <z-stack-item class="active">
+                                        <h2 class="data-tile-small--heading">Real Target</h2>
+                                        <div class="data-tile-small--value-cont">
+                                            <adj-power-target id="adj-power-target-value"
+                                                       class="data-tile-small--value">--</adj-power-target>
+                                        </div>
+                                    </z-stack-item>
+                                    <z-stack-item>
                                         <h2 class="data-tile-small--heading">Power Lap</h2>
                                         <div class="data-tile-small--value-cont">
                                             <power-lap id="power-lap-value"

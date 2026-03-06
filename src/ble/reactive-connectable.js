@@ -135,6 +135,7 @@ function ReactiveConnectable(args = {}) {
         if(!connectable.isConnected() ||
            !equals(mode, ControlMode.erg)) return;
         connectable.services.trainer.setPowerTarget({power: powerTarget});
+        print.log(`onPowerTarget(${powerTarget})`);
     }
 
     function onResistanceTarget(resistanceTarget) {
@@ -166,7 +167,7 @@ function ReactiveConnectable(args = {}) {
         if(equals(deviceType, Device.controllable)) {
             xf.sub('db:mode',             onMode, signal);
             xf.sub('db:weight',           onUserWeight, signal);
-            xf.sub('db:powerTarget',      onPowerTarget, signal);
+            xf.sub('db:adjPowerTarget',   onPowerTarget, signal);
             xf.sub('db:resistanceTarget', onResistanceTarget, signal);
             xf.sub('db:slopeTarget',      onSlopeTarget, signal);
             xf.sub('ui:trainer:reset',    onTrainerReset, signal);
