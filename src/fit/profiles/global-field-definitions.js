@@ -1373,7 +1373,8 @@ export default {
         "type": "uint16",
         "base_type": "uint16",
         "scale": 1000,
-        "units": "s"
+        "units": "s",
+        "invalid": 0xFFFF
     },
     "weather_report": {
         "type": "weather_report",

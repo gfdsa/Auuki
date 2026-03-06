@@ -138,8 +138,8 @@ class Upload extends HTMLInputElement {
         this.removeEventListener(`pointerup`, this.onSubmit);
     }
     onSubmit(e) {
-        const file = e.target.files[0];
-        xf.dispatch('ui:workout:upload', file);
+        const files = e.target.files;
+        xf.dispatch('ui:workout:upload', files);
     }
 }
 

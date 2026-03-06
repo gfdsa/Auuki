@@ -200,10 +200,12 @@ function Service(args = {}) {
     //
     // Void -> Bool
     async function stop() {
+        print.log(`:ble :tx :service ${_name} :stoping`);
         for(const key in spec) {
             await characteristics[key]?.stopNotifications();
         }
         _started = false;
+        print.log(`:ble :tx :service ${_name} :stoped`);
     }
 
     // execute all steps needed to init the service

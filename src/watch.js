@@ -1,5 +1,5 @@
 import { equals, exists, empty, first, last, xf, avg, max, toFixed, print, rand, } from './functions.js';
-import { kphToMps, mpsToKph, timeDiff } from './utils.js';
+import { kphToMps, mpsToKph, timeDiff, pad } from './utils.js';
 import { models } from './models/models.js';
 import { ControlMode, } from './ble/enums.js';
 import { TimerStatus, EventType, } from './activity/enums.js';
@@ -140,15 +140,18 @@ class Watch {
         // end Distance
 
         this.intervals         = [];
+        this.workoutType       = "workout";
+        this.autoStartCounter  = 3;
         this.autoPauseCounter  = 0;
         this.hasBeenAutoPaused = false;
-        this.autoPause         = false;
+        this.autoPause         = true;
+        this.autoStart         = true;
         this.init();
     }
     init() {
         const self = this;
 
-        xf.sub('db:workout',       workout => { self.intervals     = workout.intervals; });
+        // Data subs
         xf.sub('db:elapsed',       elapsed => { self.elapsed       = elapsed; });
         xf.sub('db:lapTime',          time => { self.lapTime       = time; });
         xf.sub('db:stepTime',         time => { self.stepTime      = time; });
@@ -168,9 +171,35 @@ class Watch {
                 console.log(`Workout done!`);
             }
         });
+        xf.sub('db:workout',       workout => {
+            self.intervals = workout.intervals;
+            if(workout.meta.category?.toLowerCase().includes("test")) {
+                self.workoutType = "test";
+                // force turn off auto pausing for Test Category workouts
+                xf.dispatch(`sources`, {autoPause: false});
+            } else {
+                self.workoutType = "workout";
+            }
+            console.log(`:workout :type ${self.workoutType}`);
+        });
         xf.sub('db:power1s', self.onPower1s.bind(this));
         xf.sub('db:sources', self.onSources.bind(this));
         timer.addEventListener('message', self.onTick.bind(self));
+
+        // UI subs
+        xf.sub('ui:workoutStart', e => { self.startWorkout();   });
+        xf.sub('ui:watchStart',   e => { self.start();          });
+        xf.sub('workout:restore', e => { self.restoreWorkout(); });
+        xf.sub('ui:watchPause',   e => { self.pause();          });
+        xf.sub('ui:watchResume',  e => { self.resume();         });
+        xf.sub('ui:watchLap',     e => { self.lap();            });
+        xf.sub('ui:watchBack',    e => { self.back();           });
+        xf.sub('ui:watchStop',    e => {
+            const stop = confirm('Confirm Stop?');
+            if(stop) {
+                self.stop();
+            }
+        });
     }
     isStarted()        { return this.state        === 'started'; };
     isPaused()         { return this.state        === 'paused'; };
@@ -180,28 +209,51 @@ class Watch {
     isIntervalType(type) {
         return equals(this.intervalType, type);
     }
+    status() {
+        return this.state;
+    }
     onSources(value) {
-        this.autoPause = value.autoPause ?? false;
+        this.autoPause = value.autoPause ?? this.autoPause;
+        this.autoStart = value.autoStart ?? this.autoStart;
     }
     onPower1s(power) {
-        if(!this.autoPause) { return; }
+        if(this.autoPause) {
+            if(power === 0 && this.isStarted()) {
+                this.autoPauseCounter += 1;
+            } else {
+                this.autoPauseCounter = 0;
+            }
 
-        if(power === 0 && this.isStarted()) {
-            this.autoPauseCounter += 1;
-        } else {
-            this.autoPauseCounter = 0;
+            if(this.autoPauseCounter >= 4) {
+                this.autoPauseCounter = 0;
+                xf.dispatch(`ui:watchPause`);
+                this.hasBeenAutoPaused = true;
+            }
+
+            if(power > 40 && this.hasBeenAutoPaused) {
+                xf.dispatch(`ui:watchResume`);
+            }
         }
 
-        // print.log(`:auto-pause-counter ${this.autoPauseCounter} ${this.hasBeenAutoPaused}`);
-
-        if(this.autoPauseCounter >= 4) {
-            this.autoPauseCounter = 0;
-            xf.dispatch(`ui:watchPause`);
-            this.hasBeenAutoPaused = true;
-        }
-
-        if(power > 40 && this.hasBeenAutoPaused) {
-            xf.dispatch(`ui:watchResume`);
+        if(this.autoStart && this.isStopped()) {
+            // check
+            if(this.autoStartCounter < 0) return;
+            if(this.autoStartCounter === 0) {
+                this.autoStartCounter = -1;
+                xf.dispatch(`ui:watchStart`);
+                xf.dispatch('ui:workoutStart');
+                xf.dispatch(`ui:autoStartCounter`, -1);
+                return;
+            }
+            // update
+            if(power === 0) {
+                this.autoStartCounter = 3;
+                xf.dispatch(`ui:autoStartCounter`, this.autoStartCounter);
+            }
+            if(power > 40) {
+                this.autoStartCounter -= 1;
+                xf.dispatch(`ui:autoStartCounter`, this.autoStartCounter);
+            }
         }
     }
     start() {
@@ -209,7 +261,6 @@ class Watch {
         if(self.isStarted() && !self.isWorkoutStarted()) {
             self.pause();
         } else {
-            // self.timer = setInterval(self.onTick.bind(self), 1000);
             timer.postMessage('start');
             xf.dispatch('watch:started');
 
@@ -222,7 +273,14 @@ class Watch {
     startWorkout() {
         const self = this;
 
-        if(self.isWorkoutStarted() || self.isWorkoutDone()) {
+        // in case of pressing play button during auto start countdown
+        this.autoStartCounter = -1;
+        xf.dispatch(`ui:autoStartCounter`, -1);
+
+        if(self.isWorkoutStarted() || (
+            // check for intervalIndex allows for multiple workouts in one session
+            self.isWorkoutDone() && self.intervalIndex > 0
+        )) {
             return;
         }
 
@@ -265,7 +323,6 @@ class Watch {
     resume() {
         const self = this;
         if(!self.isStarted()) {
-            // self.timer = setInterval(self.onTick.bind(self), 1000);
             timer.postMessage('start');
             xf.dispatch('watch:started');
 
@@ -290,21 +347,22 @@ class Watch {
     stop() {
         const self = this;
         if(self.isStarted() || self.isPaused()) {
-            // clearInterval(self.timer);
             timer.postMessage('stop');
-
-            xf.dispatch('watch:stopped');
 
             xf.dispatch('watch:event', {
                 timestamp: Date.now(),
                 type: EventType.stop,
             });
 
+
             if(self.isWorkoutStarted()) {
                 xf.dispatch('workout:stopped');
             }
 
             self.lap();
+
+            // should be called after event and lap are created
+            xf.dispatch('watch:stopped');
 
             if(exists(self.intervals)) {
                 xf.dispatch('watch:intervalIndex', 0);
@@ -328,7 +386,7 @@ class Watch {
         }
 
         if(equals(lapTime, 4) && stepTime > 0) {
-            xf.dispatch('watch:beep');
+            xf.dispatch('watch:beep', 'interval');
         }
         xf.dispatch('watch:elapsed',  elapsed);
         xf.dispatch('watch:lapTime',  lapTime);
@@ -399,6 +457,27 @@ class Watch {
         }
         return undefined;
     }
+    back() {
+        const self = this;
+
+        if(self.isWorkoutStarted()) {
+            let i             = self.intervalIndex;
+            let s             = self.stepIndex;
+            let intervals     = self.intervals;
+            let lessIntervals = (i - 1) >= 0;
+
+            if(lessIntervals) {
+                i -= 1;
+                s  = 0;
+
+                self.nextInterval(intervals, i, s);
+                self.nextStep(intervals, i, s);
+            }
+        } else {
+            xf.dispatch('watch:lap');
+            xf.dispatch('watch:lapTime', 0);
+        }
+    }
 
     isDurationStep(intervals, intervalIndex, stepIndex) {
         return exists(intervals[intervalIndex].steps[stepIndex].duration);
@@ -433,7 +512,7 @@ class Watch {
     }
 }
 
-// Register DB Events
+// These regs have access to the global db state and can mutate it
 xf.reg('watch:lapDuration',    (time, db) => db.intervalDuration = time);
 xf.reg('watch:stepDuration',   (time, db) => db.stepDuration     = time);
 xf.reg('watch:lapTime',        (time, db) => db.lapTime          = time);
@@ -482,89 +561,10 @@ xf.reg('watch:started',   (x, db) => {
 xf.reg('watch:paused',  (x, db) => db.watchStatus = 'paused');
 xf.reg('watch:stopped', (x, db) => db.watchStatus = 'stopped');
 
-xf.reg('watch:elapsed', (x, db) => {
-    if(equals(db.watchStatus, TimerStatus.stopped)) {
-        db.elapsed   = x;
-        return;
-    };
-
-    db.elapsed   = x;
-
-    const speed = equals(db.sources.virtualState, 'speed') ?
-                  db.speed :
-                  db.speedVirtual;
-
-    const record = {
-        timestamp:  Date.now(),
-        power:      db.power1s,
-        cadence:    db.cadence,
-        speed:      speed,
-        heart_rate: db.heartRate,
-        distance:   db.distance,
-        grade:      db.slopeTarget,
-        altitude:   db.altitude,
-        position_lat:                 db.position_lat,
-        position_long:                db.position_long,
-        saturated_hemoglobin_percent: db.smo2,
-        total_hemoglobin_conc:        db.thb,
-        core_temperature:             db.coreBodyTemperature,
-        skin_temperature:             db.skinTemperature,
-        device_index:                 0,
-    };
-
-    db.records.push(record);
-    db.lap.push(record);
-
-    if(equals(db.elapsed % 60, 0)) {
-        models.session.backup(db);
-        console.log(`backing up of ${db.records.length} records ...`);
-    }
-});
-xf.reg('watch:lap', (x, db) => {
-    let timeEnd   = Date.now();
-    let timeStart = db.lapStartTime;
-    let elapsed   = timeDiff(timeStart, timeEnd);
-
-    if(elapsed > 0) {
-        const lap = {
-            timestamp:        timeEnd,
-            start_time:       timeStart,
-            totalElapsedTime: elapsed,
-            avgPower:         db.powerLap,
-            maxPower:         max(db.lap, 'power'),
-            avgCadence:       Math.round(avg(db.lap, 'cadence')),
-            avgHeartRate:     Math.round(avg(db.lap, 'heart_rate')),
-            saturated_hemoglobin_percent: toFixed(avg(db.lap, 'saturated_hemoglobin_percent'), 2),
-            total_hemoglobin_conc: toFixed(avg(db.lap, 'total_hemoglobin_conc'), 2),
-            core_temperature: toFixed(avg(db.lap, 'core_temperature'), 2),
-            skin_temperature: toFixed(avg(db.lap, 'skin_temperature'), 2)
-        };
-
-        db.laps.push(lap);
-        db.lap = [];
-    }
-    db.lapStartTime = timeEnd + 0;
-});
-
-xf.reg('watch:event', (x, db) => {
-    if(!empty(db.events) && equals(last(db.events).type, x.type)) return;
-
-    db.events.push(x);
-});
+xf.reg('watch:elapsed', models.session.elapsed);
+xf.reg('watch:lap', models.session.lap);
+xf.reg('watch:event', models.session.event);
 
 const watch = new Watch();
-
-xf.sub('ui:workoutStart', e => { watch.startWorkout();   });
-xf.sub('ui:watchStart',   e => { watch.start();          });
-xf.sub('workout:restore', e => { watch.restoreWorkout(); });
-xf.sub('ui:watchPause',   e => { watch.pause();          });
-xf.sub('ui:watchResume',  e => { watch.resume();         });
-xf.sub('ui:watchLap',     e => { watch.lap();            });
-xf.sub('ui:watchStop',    e => {
-    const stop = confirm('Confirm Stop?');
-    if(stop) {
-        watch.stop();
-    }
-});
 
 export { watch };

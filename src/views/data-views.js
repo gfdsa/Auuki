@@ -1,6 +1,8 @@
-import { xf, exists, existance, validate, equals, isNumber, last, empty, avg, toFixed } from '../functions.js';
+import { xf, exists, existance, validate, equals, isNumber, last, empty, avg, toFixed, formatDate, } from '../functions.js';
 import { formatTime } from '../utils.js';
 import { models } from '../models/models.js';
+import { DialogMsg } from '../models/enums.js';
+
 
 //
 // DataView
@@ -85,6 +87,81 @@ class DataView extends HTMLElement {
 }
 
 customElements.define('data-view', DataView);
+
+
+class AutoStartCounter extends HTMLElement {
+    constructor() {
+        super();
+        this.isVisible = false;
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+
+        xf.sub('ui:autoStartCounter', this.onUpdate.bind(this), this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    onUpdate(value) {
+        if(value === -1) {
+            this.hide();
+        } else {
+            if(!this.isVisible) {
+                this.show();
+            }
+            this.render(value);
+        }
+    }
+    show() {
+        this.classList.add('active');
+    }
+    hide() {
+        this.classList.remove('active');
+    }
+    render(value) {
+        this.textContent = value;
+    }
+}
+
+customElements.define('auto-start-counter', AutoStartCounter);
+
+class ModeLockToggle extends HTMLElement {
+    constructor() {
+        super();
+        this.isOn = false;
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+        this.$icon = this.querySelector('.mode-lock--toggle--icon');
+        this.$use = this.querySelector('use');
+
+        this.addEventListener('pointerup', this.onPointerup.bind(this), this.signal);
+        xf.sub('db:lock', this.onUpdate.bind(this), this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    onUpdate(value) {
+        this.isOn = value;
+        this.render();
+    }
+    onPointerup() {
+        xf.dispatch('ui:lock-set');
+    }
+    render() {
+        if(this.isOn) {
+            this.$use.setAttribute('href', '#icon--lock--close');
+        } else {
+            this.$use.setAttribute('href', '#icon--lock--open');
+        }
+    }
+}
+
+customElements.define('mode-lock-toggle', ModeLockToggle);
 
 
 class TimerTime extends DataView {
@@ -273,6 +350,9 @@ class CadenceValue extends DataView {
             prop: 'db:cadence',
         };
     }
+    transform(state) {
+        return Math.round(state);
+    }
 }
 
 customElements.define('cadence-value', CadenceValue);
@@ -352,6 +432,10 @@ class HeartRateValue extends DataView {
             prop: 'db:heartRate',
         };
     }
+    transform(state) {
+        this.style = 'color: #FE340B';
+        return Math.round(state);
+    }
 }
 
 customElements.define('heart-rate-value', HeartRateValue);
@@ -382,6 +466,19 @@ class HeartRateAvgValue extends DataView {
 
 customElements.define('heart-rate-avg-value', HeartRateAvgValue);
 
+class HeartRateMaxValue extends DataView {
+    getDefaults() {
+        return {
+            prop: 'db:heartRateMax',
+        };
+    }
+    transform(state) {
+        return Math.round(state);
+    }
+}
+
+customElements.define('heart-rate-max-value', HeartRateMaxValue);
+
 
 class SmO2Value extends DataView {
     getDefaults() {
@@ -397,13 +494,14 @@ class SmO2Value extends DataView {
     // this.style = 'color: #278B65';
     // this.style = 'color: #D72A1C';
     transform(state) {
-        if(state < models.smo2.zones.one) {
-            this.style = 'color: #328AFF';
-        } else if(state < models.smo2.zones.two) {
-            this.style = 'color: #56C057';
-        } else {
-            this.style = 'color: #FE340B';
-        }
+        // if(state < models.smo2.zones.one) {
+        //     this.style = 'color: #328AFF';
+        // } else if(state < models.smo2.zones.two) {
+        //     this.style = 'color: #56C057';
+        // } else {
+        //     this.style = 'color: #FE340B';
+        // }
+        this.style = 'color: #56C057';
         return toFixed(state, 1);
     }
 }
@@ -421,6 +519,7 @@ class THbValue extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
+        this.style = 'color: #FF663A';
         return toFixed(state, 2);
     }
 }
@@ -484,6 +583,7 @@ class SkinTemperatureValue extends DataView {
 customElements.define('skin-temperature-value', SkinTemperatureValue);
 
 
+
 class WorkoutName extends DataView {
     getDefaults() {
         return {
@@ -505,6 +605,8 @@ class PowerTarget extends DataView {
         };
     }
 }
+
+customElements.define('power-target', PowerTarget);
 
 class PowerTargetFTP extends DataView {
     getDefaults() {
@@ -560,34 +662,61 @@ class CompanionGroup extends DataView {
 
 customElements.define('companion-group', CompanionGroup);
 
-class ZStack extends DataView {
-    getDefaults() {
-        return {
-            prop: '',
-            items: [],
-            active: 0,
-        };
-    }
-    postInit() {
+class ZStack extends HTMLElement {
+    constructor() {
+        super();
         this.items = [];
-        this.active = 0;
+        this.activeIndex = 0;
     }
-    config() {
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+
         this.$items = this.querySelectorAll('z-stack-item');
+        this.key = this.dataset.key;
+        this.persistance = exists(this.key) ? true : false;
+        this.hasSwitchSub = exists(this.dataset.sub);
+
+        if(this.hasSwitchSub) {
+            xf.sub(this.$sub, this.onSwitch.bind(this), this.signal);
+        } else {
+            this.addEventListener(`pointerup`, this.onSwitch.bind(this), this.signal);
+        }
+
+        if(this.persistance) {
+            xf.sub(`db:sources`, this.onSources.bind(this), this.signal);
+        }
     }
-    subs() {
-        this.addEventListener(`pointerup`, this.onPointerup.bind(this), this.signal);
+    disconnectedCallback() {
+        this.abortController.abort();
     }
-    onPointerup() {
-        this.incrementActive();
+    onSources(value) {
+        const index = parseInt(value[this.key] ?? this.activeIndex);
+        // console.log(`:onSources ${index} === ${this.activeIndex}`);
+        if(index === this.activeIndex) return;
+        this.activeIndex = index;
         this.render();
     }
+    onSwitch() {
+        this.incrementActive();
+        this.render();
+
+        if(this.persistance) {
+            this.backup();
+        }
+    }
+    backup() {
+        const update = {};
+        update[this.key] = this.activeIndex;
+        xf.dispatch(`sources`, update);
+    }
     incrementActive() {
-        this.active = (this.active + 1) % Math.max(this.$items.length, 1);
+        this.activeIndex = (this.activeIndex + 1) % Math.max(this.$items.length, 1);
     }
     render() {
         this.$items.forEach(($item, i) => {
-            if(equals(i, this.active)) {
+            if(equals(i, this.activeIndex)) {
                 $item.classList.add('active');
             } else {
                 $item.classList.remove('active');
@@ -598,7 +727,6 @@ class ZStack extends DataView {
 
 customElements.define('z-stack', ZStack);
 
-customElements.define('power-target', PowerTarget);
 
 class SlopeTarget extends DataView {
     getDefaults() {
@@ -717,6 +845,7 @@ class PowerValue extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
+        this.style = 'color: #F8C73A';
         return Math.round(state);
     }
 }
@@ -749,7 +878,7 @@ class PowerAvg extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
-        return Math.round(state);
+        return Math.ceil(state);
     }
 }
 
@@ -765,7 +894,7 @@ class PowerLap extends DataView {
         xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
     }
     transform(state) {
-        return Math.round(state);
+        return Math.ceil(state);
     }
 }
 
@@ -1007,27 +1136,6 @@ class InstantPowerGraph extends HTMLElement {
 customElements.define('instant-power-graph', InstantPowerGraph);
 
 
-class PowerGraph extends HTMLElement {
-    constructor() {
-        super();
-    }
-
-    toBar(power) {
-        const zone = models.ftp.powerToZone(this.value).name;
-        const height = this.powerToHeight();
-    }
-    powerToHeight(power) {
-        return 100;
-    }
-    render(power) {
-        this.insertAdjacentHTML('beforeend', this.toBar(power));
-        this.barsCount += 1;
-    }
-}
-
-customElements.define('power-graph', PowerGraph);
-
-
 class SwitchGroup extends HTMLElement {
     constructor() {
         super();
@@ -1063,15 +1171,10 @@ class SwitchGroup extends HTMLElement {
     }
     onSwitch(e) {
         const element = this.eventOwner(e);
-        console.log(e);
-        console.log(element);
-        console.log(element.attributes.index);
-        console.log(exists(element.attributes.index));
 
         if(exists(element.attributes.index)) {
 
             const id = parseInt(element.attributes.index.value) || 0;
-            console.log(id);
 
             if(equals(id, this.state)) {
                 return;
@@ -1153,75 +1256,317 @@ class DataTileSwitchGroup extends SwitchGroup {
 
 customElements.define('data-tile-switch-group', DataTileSwitchGroup);
 
-class LibrarySwitchGroup extends SwitchGroup {
-    postInit() {
-        this.prop = 'librarySwitch';
-        this.effect = 'ui:library-switch-set';
-    }
-    config() {
-        this.$workouts = document.querySelector('#workouts');      // tab 0
-        this.$editor = document.querySelector('#workout-editor');  // tab 1
-        this.$rideReport = document.querySelector('#ride-report'); // tab 2
 
-        this.renderEffect(this.state);
-    }
-    renderEffect(state) {
-        if(equals(state, 2)) {
-            this.$rideReport.classList.add('active');
-            this.$workouts.classList.remove('active');
-            this.$editor.classList.remove('active');
-        }
-        if(equals(state, 1)) {
-            this.$editor.classList.add('active');
-            this.$workouts.classList.remove('active');
-            this.$rideReport.classList.remove('active');
-        }
-        if(equals(state, 0)) {
-            this.$workouts.classList.add('active');
-            this.$rideReport.classList.remove('active');
-            this.$editor.classList.remove('active');
-        }
-        return;
-    }
-}
-
-customElements.define('library-switch-group', LibrarySwitchGroup);
-
-class AuthForms extends HTMLElement {
+class NavigationStack extends HTMLElement {
     constructor() {
         super();
-        this.postInit();
-    }
-    postInit() {
     }
     connectedCallback() {
         const self = this;
         this.abortController = new AbortController();
         this.signal = { signal: self.abortController.signal };
 
-        this.$signup = document.querySelector('#signup--form--section'); // tab 0
-        this.$login = document.querySelector('#login--form--section');   // tab 1
-        this.$toSignUp = document.querySelector('#to-signup--button');
-        this.$toLogin= document.querySelector('#to-login--button');
+        this.tabs = {
+            settings: {
+                $view: document.querySelector(`#view--settings`),
+                $link: document.querySelector(`#link--settings`),
+                children: {
+                    settings: {
+                        $view: document.querySelector(`#view--settings-settings`),
+                        $link: document.querySelector(`#link--settings-settings`),
+                    },
+                    profile: {
+                        $view: document.querySelector(`#view--settings-profile`),
+                        $link: document.querySelector(`#link--settings-profile`),
+                    }
+                }
+            },
+            home: {
+                $view: document.querySelector(`#view--home`),
+                $link: document.querySelector(`#link--home`),
+            },
+            workouts: {
+                $view: document.querySelector(`#view--workouts`),
+                $link: document.querySelector(`#view--workouts`),
 
-        this.$toSignUp.addEventListener('pointerup', self.toSignup.bind(this));
-        this.$toLogin.addEventListener('pointerup', self.toLogin.bind(this));
+                children: {
+                    workouts: {
+                        $view: document.querySelector(`#view--workouts-workouts`),
+                        $link: document.querySelector(`#link--workouts-workouts`),
+                    },
+                    editor: {
+                        $view: document.querySelector(`#view--workouts-editor`),
+                        $link: document.querySelector(`#link--workouts-editor`),
+                    },
+                    report: {
+                        $view: document.querySelector(`#view--workouts-report`),
+                        $link: document.querySelector(`#link--workouts-report`),
+                    }
+                }
+            },
+        };
+        xf.sub(`action:nav`, this.onAction.bind(this), this.signal);
     }
     disconnectedCallback() {
         this.abortController.abort();
-        this.unsubs();
     }
-    toSignup() {
-        this.$login.classList.remove('active');
-        this.$signup.classList.add('active');
+    onAction(action) {
+        console.log(action);
+
+        if(action === 'settings') {
+            this.switch('settings', this.tabs);
+            return;
+        }
+        if(action === 'home') {
+            this.switch('home', this.tabs);
+            return;
+        }
+        if(action === 'workouts') {
+            this.switch('workouts', this.tabs);
+            return;
+        }
+
+        if(action === 'settings:settings') {
+            this.switch('settings', this.tabs.settings.children);
+            return;
+        }
+        if(action === 'settings:profile') {
+            this.switch('profile', this.tabs.settings.children);
+            models.api.auth.loadTurnstile();
+            return;
+        }
+
+        if(action === 'workouts:workouts') {
+            this.switch('workouts', this.tabs.workouts.children);
+            return;
+        }
+        if(action === 'workouts:editor') {
+            this.switch('editor', this.tabs.workouts.children);
+            return;
+        }
+        if(action === 'workouts:report') {
+            this.switch('report', this.tabs.workouts.children);
+            return;
+        }
     }
-    toLogin() {
-        this.$signup.classList.remove('active');
-        this.$login.classList.add('active');
+    switch(target, elements) {
+        // prevent potential content flash
+        // by first removing and only after that adding .active
+        // if there is no target element this is not an error,
+        // it means all content should be 'non-active'
+        for(let prop in elements) {
+            if(!(target === prop)) {
+                elements[prop].$view.classList.remove('active');
+                elements[prop].$link.classList.remove('active');
+            }
+        }
+        if(target) {
+            elements[target].$view.classList.add('active');
+            elements[target].$link.classList.add('active');
+        }
     }
 }
 
-customElements.define('auth-forms', AuthForms);
+customElements.define('navigation-stack', NavigationStack);
+
+
+// TODO:
+// - use data-<prop name> properties instead of attributes
+// - get them with this.dataset.<data name>
+class ViewAction extends HTMLElement {
+    constructor() {
+        super();
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+
+        const action = this.getAttribute('action');
+        const topic = this.getAttribute('topic') ?? '';
+        const on = this.getAttribute('on') ?? 'pointerup';
+        const stopPropagation = this.hasAttribute('stoppropagation');
+
+        if(action === undefined || action === '') {
+            throw Error(`need to setup action attribute on view-action `, self);
+        }
+
+        this.addEventListener(on, (e) => {
+            if(stopPropagation) {
+                e.stopPropagation();
+            }
+            // console.log(`action${topic}`, action, stopPropagation);
+            xf.dispatch(`action${topic}`, action);
+            this.postAction();
+        }, this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    postAction() {
+    }
+}
+
+customElements.define('view-action', ViewAction);
+
+
+class BatteryLevel extends HTMLElement {
+    constructor() {
+        super();
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+
+        this.for = this.getAttribute('for');
+        this.$level = this.querySelector('.battery--level');
+
+        xf.sub(`${this.for}:batteryLevel`, this.onUpdate.bind(this), this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    onUpdate(level) {
+        this.$level.style.width = `${level}%`;
+
+        this.classList.remove('ok');
+        this.classList.remove('low');
+        this.classList.remove('critical');
+
+        if(level < 11) {
+            this.classList.add('critical');
+            return;
+        }
+        if(level < 21) {
+            this.classList.add('low');
+            return;
+        }
+        this.classList.add('ok');
+    }
+}
+
+customElements.define('battery-level', BatteryLevel);
+
+
+class NavigationAction extends ViewAction {
+    constructor() {
+        super();
+    }
+    connectedCallback() {
+        super.connectedCallback();
+    }
+    disconnectedCallback() {
+        super.disconnectedCallback();
+    }
+    postAction() {
+        // this.siblings = this.parentElement.querySelectorAll('navigation-action');
+        // for(let sibling of this.siblings) {
+        //     sibling.classList.remove('active');
+        // }
+        // this.classList.add('active');
+    }
+}
+
+customElements.define('navigation-action', NavigationAction);
+
+
+class OAuth extends HTMLElement {
+    constructor() {
+        super();
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+        this.services = {strava: false, intervals: false};
+
+        this.$stravaButton = self.querySelector('#strava--connect--button');
+        this.$intervalsButton = self.querySelector('#intervals--connect--button');
+        this.$tpButton = self.querySelector('#tp--connect--button');
+
+        xf.sub('action:oauth', self.onAction.bind(this), this.signal);
+        xf.sub('db:services', self.onServices.bind(this), this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    onServices(value) {
+        this.services = value;
+        this.render(this.services);
+    }
+    onAction(action) {
+        const self = this;
+        console.log(action);
+
+        let service = action.split(':')[1];
+
+        if(service === 'strava' ||
+           service === 'intervals' ||
+           service === 'trainingPeaks') {
+
+            console.log(this.services[service]);
+            if(this.services[service]) {
+                models.api[service].disconnect();
+            } else {
+                models.api[service].connect();
+            }
+            return;
+        }
+    }
+    render(services) {
+        if(exists(this.$stravaButton)) {
+            this.$stravaButton.textContent = services.strava ? 'Disconnect' : 'Connect';
+        }
+        if(exists(this.$intervalsButton)) {
+            this.$intervalsButton.textContent = services.intervals ? 'Disconnect' : 'Connect';
+        }
+        if(exists(this.$tpButton)) {
+            this.$tpButton.textContent = services.tp ? 'Disconnect' : 'Connect';
+        }
+    }
+}
+
+customElements.define('o-auth', OAuth);
+
+
+
+
+class ModalError extends HTMLElement {
+    constructor() {
+        super();
+    }
+    connectedCallback() {
+        const self = this;
+        this.abortController = new AbortController();
+        this.signal = { signal: self.abortController.signal };
+
+        this.$dialog = this.querySelector(`dialog`);
+        this.$dismissBtn = this.querySelector(`.dialog--dismiss--btn`);
+        this.$message = this.querySelector(`.dialog--message`);
+
+        xf.sub(`ui:modal:error:open`, this.onOpen.bind(this), this.signal);
+        this.$dismissBtn.addEventListener('pointerup', this.onClose.bind(this), this.signal);
+    }
+    disconnectedCallback() {
+        this.abortController.abort();
+    }
+    onOpen(msg) {
+        this.$dialog.showModal();
+        this.$message.innerHTML = this.message(msg);
+    }
+    onClose(result) {
+        this.$dialog.close();
+    }
+    message(msg) {
+        if(msg === DialogMsg.noAuth) {
+            return `Your session is over. You need to login again.`;
+        };
+        return '';
+    }
+}
+
+customElements.define('modal-error', ModalError);
 
 
 class MeasurementUnit extends DataView {
@@ -1305,7 +1650,9 @@ customElements.define('virtual-state-source', VirtualStateSource);
 class AutoPause extends DataView {
     postInit() {
         this.effect  = 'sources';
+        this.key     = 'autoPause';
         this.state   = { autoPause: false };
+        this.values  = {on: {autoPause: true}, off: {autoPause: false}};
     }
     getDefaults() {
         return {
@@ -1318,14 +1665,14 @@ class AutoPause extends DataView {
         this.addEventListener('pointerup', this.onEffect.bind(this), this.signal);
     }
     onUpdate(value) {
-        this.state = value.autoPause;
+        this.state = value[this.key];
         this.render();
     }
     onEffect() {
         if(equals(this.state, true)) {
-            xf.dispatch(`${this.effect}`, {autoPause: false});
+            xf.dispatch(`${this.effect}`, this.values.off);
         } else {
-            xf.dispatch(`${this.effect}`, {autoPause: true});
+            xf.dispatch(`${this.effect}`, this.values.on);
         }
     }
     render() {
@@ -1334,6 +1681,17 @@ class AutoPause extends DataView {
 }
 
 customElements.define('auto-pause', AutoPause);
+
+class AutoStart extends AutoPause {
+    postInit() {
+        this.effect  = 'sources';
+        this.key     = 'autoStart';
+        this.state   = { autoStart: true };
+        this.values  = {on: {autoStart: true}, off: {autoStart: false}};
+    }
+}
+
+customElements.define('auto-start', AutoStart);
 
 class Theme extends DataView {
     postInit() {
@@ -1357,30 +1715,59 @@ class Theme extends DataView {
     onEffect() {
         if(equals(this.state, 'DARK')) {
             xf.dispatch(`${this.effect}`, {theme: 'WHITE'});
+        }else if (equals(this.state, 'WHITE')) {
+            xf.dispatch(`${this.effect}`, {theme: 'AUTO'});
         } else {
             xf.dispatch(`${this.effect}`, {theme: 'DARK'});
         }
     }
     render() {
-        this.textContent = equals(this.state, 'DARK') ? 'DARK' : 'WHITE';
-        document.body.className =  equals(this.state, 'DARK') ? 'dark-theme' : 'white-theme';
+        this.textContent = equals(this.state, 'DARK') ? 'DARK' : equals(this.state, 'WHITE') ? 'WHITE' : 'AUTO';
+        document.body.className =  equals(this.state, 'DARK') ? 'dark-theme' : equals(this.state, 'WHITE') ? 'white-theme' : 'auto-theme';
     }
 }
 
 customElements.define('theme-layout', Theme);
+
+class DockModeDefault extends DataView {
+    postInit() {
+        this.effect  = 'dockMode';
+        this.state   = false;
+    }
+    getDefaults() {
+        return {
+            prop: 'db:dockMode',
+            effect: 'dockMode'
+        };
+    }
+    subs() {
+        xf.sub(`${this.prop}`, this.onUpdate.bind(this), this.signal);
+        this.addEventListener('pointerup', this.onEffect.bind(this), this.signal);
+    }
+    onUpdate(value) {
+        this.state = value;
+        this.render();
+    }
+    onEffect() {
+        if(equals(this.state, true)) {
+            xf.dispatch(`${this.effect}`, false);
+        } else {
+            xf.dispatch(`${this.effect}`, true);
+        }
+    }
+    render() {
+        this.textContent = equals(this.state, true) ? 'ON' : 'OFF';
+    }
+}
+
+customElements.define('dock-mode-default', DockModeDefault);
 
 class DockModeBtn extends DataView {
     subs() {
         this.addEventListener('pointerup', this.onSwitch.bind(this), this.signal);
     }
     onSwitch() {
-        const href = document.location.href;
-        const width = window.screen.availWidth;
-        const height = 150;
-        const top = 0; // window.screen.availHeight - height;
-
-        // window.resizeTo(width, height);
-        window.open(`${href}`, '', `width=${width},height=${height},left=0,top=${top}`);
+        models.dockMode.open();
     }
 }
 
@@ -1502,5 +1889,8 @@ export {
     DataTileSwitchGroup,
 
     DockModeBtn,
-}
 
+    NavigationStack,
+    ViewAction,
+    BatteryLevel,
+}

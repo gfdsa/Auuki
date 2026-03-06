@@ -3,29 +3,18 @@ import { models } from '../models/models.js';
 import { intervalsToGraph, courseToGraph, renderInfo } from './workout-graph.js';
 
 const radioOff = `
-        <svg class="radio radio-off" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M0 0h24v24H0V0z" fill="none"/>
-            <path class="path" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12
-                    2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
+        <svg class="radio radio-off">
+            <use href="#icon--radio-off">
         </svg>`;
 
 const radioOn = `
-        <svg class="radio radio-on" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24">
-            <path d="M0 0h24v24H0V0z" fill="none"/>
-            <path class="path" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0
-                    18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/>
-            <circle class="circle" cx="12" cy="12" r="5"/>
+        <svg class="radio radio-on">
+            <use href="#icon--radio-on">
         </svg>`;
 
-const removeBtn = `
-        <svg class="workout--remove control--btn--icon" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-            <path d="m376-300 104-104 104 104 56-56-104-104 104-104-56-56-104 104-104-104-56 56 104 104-104 104 56 56Zm-96 180q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520Zm-400 0v520-520Z"/>
-        </svg>
-`;
-
 const options = `
-        <svg class="workout--options-btn control--btn--icon" xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24">
-            <path d="M480-160q-33 0-56.5-23.5T400-240q0-33 23.5-56.5T480-320q33 0 56.5 23.5T560-240q0 33-23.5 56.5T480-160Zm0-240q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm0-240q-33 0-56.5-23.5T400-720q0-33 23.5-56.5T480-800q33 0 56.5 23.5T560-720q0 33-23.5 56.5T480-640Z"/>
+        <svg class="workout--options-btn control--btn--icon">
+            <use href="#icon--options">
         </svg>`;
 
 function workoutTemplate(workout) {
@@ -36,7 +25,7 @@ function workoutTemplate(workout) {
     if(workout.meta.distance) {
         duration = `${(workout.meta.distance / 1000).toFixed(2)} km`;
     }
-    return `<li is="workout-item" class='workout cf' id="${workout.id}" metric="ftp">
+    return `<workout-item class='workout cf' id="${workout.id}" metric="ftp">
                 <div class="workout--info">
                     <div class="workout--short-info">
                         <div class="workout--summary">
@@ -56,10 +45,10 @@ function workoutTemplate(workout) {
                 <div class="workout--actions">
                     <span class="workout--remove">Delete</span>
                 </div>
-            </li>`;
+            </workout-item>`;
 }
 
-class WorkoutList extends HTMLUListElement {
+class WorkoutList extends HTMLElement {
     constructor() {
         super();
         this.state = [];
@@ -142,16 +131,14 @@ class WorkoutList extends HTMLUListElement {
 
 
 
-class WorkoutListItem extends HTMLLIElement {
+class WorkoutListItem extends HTMLElement {
     constructor() {
         super();
         this.state = '';
-        this.postInit();
         this.isExpanded = false;
         this.isSelected = false;
         this.optionsActive = false;
     }
-    postInit() { return; }
     connectedCallback() {
         const self = this;
         this.infoCont = this.querySelector('.workout--info');
@@ -173,10 +160,9 @@ class WorkoutListItem extends HTMLLIElement {
         };
 
         this.dom = {};
-        this.dom.info = this.querySelector('#graph--info--cont');
+        this.dom.info = this.querySelector('.graph--info--cont');
         this.dom.cont = this.querySelector('.workout-list--graph-cont');
         this.viewPort = this.getViewPort();
-
 
         xf.sub('db:workout', this.onWorkout.bind(this), this.signal);
         this.summary.addEventListener('pointerup', this.toggleExpand.bind(this), this.signal);
@@ -309,6 +295,13 @@ class WorkoutListItem extends HTMLLIElement {
     }
 }
 
-customElements.define('workout-list', WorkoutList, {extends: 'ul'});
-customElements.define('workout-item', WorkoutListItem, {extends: 'li'});
+customElements.define('workout-list', WorkoutList);
+customElements.define('workout-item', WorkoutListItem);
+
+export {
+    radioOff,
+    radioOn,
+    options,
+    workoutTemplate,
+};
 

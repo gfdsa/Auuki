@@ -1,8 +1,14 @@
 //
 // File Handler
 //
+import { dateToDashString } from './utils.js';
 
 class FileHandler {
+    Type = {
+        OctetStream: 'application/octet-stream',
+        textPlain: 'text/plain',
+    }
+
     constructor(args) {}
     readTextFile(file) {
         const self = this;
@@ -46,13 +52,17 @@ class FileHandler {
             default:           self.unsupportedFormat(); break;
         }
     }
-    saveFile() {
+    toBlob(buffer, type) {
+        const self = this;
+        return new Blob([buffer], {type: type ?? self.Type.OctetStream});
+    }
+    download() {
         const self = this;
         let a = document.createElement('a');
         document.body.appendChild(a);
         a.style = 'display: none';
-        return function (blob, name) {
-            let url = window.URL.createObjectURL(blob);
+        return function (buffer, name, type) {
+            let url = window.URL.createObjectURL(self.toBlob(buffer, type));
             a.href = url;
             a.download = name;
             a.click();

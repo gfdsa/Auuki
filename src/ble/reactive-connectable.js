@@ -87,6 +87,15 @@ function ReactiveConnectable(args = {}) {
 
         if('heartRate' in data && models.sources.isSource('heartRate', identifier)) {
             xf.dispatch(`heartRate`, data.heartRate);
+
+            if('rrInterval' in data) {
+                xf.dispatch(`rrInterval`, data.rrInterval);
+            }
+        }
+
+        if('batteryLevel' in data) {
+            xf.dispatch(`${getIdentifier()}:batteryLevel`, data.batteryLevel);
+            console.log(`:ble :device ${connectable.getName()} ${getIdentifier()} :battery-level ${data.batteryLevel}`);
         }
 
         if('currentSaturatedHemoglobin' in data) {
@@ -143,6 +152,12 @@ function ReactiveConnectable(args = {}) {
         connectable.services.trainer.setSimulation({grade: slopeTarget});
     }
 
+    function onTrainerReset() {
+        if(!connectable.isConnected() ||
+           !exists(connectable.services?.trainer?.reset)) return;
+        connectable.services.trainer.reset();
+    }
+
     function start() {
         abortController = new AbortController();
         signal = { signal: abortController.signal };
@@ -155,6 +170,7 @@ function ReactiveConnectable(args = {}) {
             xf.sub('db:adjPowerTarget',   onPowerTarget, signal);
             xf.sub('db:resistanceTarget', onResistanceTarget, signal);
             xf.sub('db:slopeTarget',      onSlopeTarget, signal);
+            xf.sub('ui:trainer:reset',    onTrainerReset, signal);
         }
     }
 
